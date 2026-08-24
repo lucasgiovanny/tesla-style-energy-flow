@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed the scene corner radius to follow the active theme through `--ha-card-border-radius` instead of a hardcoded `16px`, so a theme with square cards no longer shows a rounded scene and a theme with a larger radius no longer mismatches the card around it
+
 ## 0.3.31 - 2026-08-24
 
 - Added Brazilian Portuguese (`pt-BR`) and European Portuguese (`pt-PT`) translations for the card and the config editor

@@ -2432,7 +2432,10 @@
             width: 100%;
             height: auto;
             display: block;
-            border-radius: 16px;
+            /* Follow the active theme instead of imposing a radius of our own.
+               With no theme value the scene stays square and ha-card's own
+               radius does the rounding through the overflow: hidden above. */
+            border-radius: var(--ha-card-border-radius, 0);
             border: 0;
             background: #020617;
           }
