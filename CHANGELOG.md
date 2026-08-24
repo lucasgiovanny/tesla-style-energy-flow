@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.31 - 2026-08-24
 
 - Added Brazilian Portuguese (`pt-BR`) and European Portuguese (`pt-PT`) translations for the card and the config editor
 - Added region-aware language resolution so `pt-BR` and `pt-PT` are kept apart, with a bare `pt` profile mapping to `pt-PT`
