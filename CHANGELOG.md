@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.34 - 2026-08-26
 
 - The grid outage indicator now distinguishes why the site is off-grid: a real grid failure (`off_grid_unintentional`, `outage`) shows a red X with a localized `GRID OUTAGE` status word under the grid value, an intentional off-grid mode (`off_grid_intentional`, `Disconnected intentionally`) keeps the orange X with `OFF-GRID`, and an unknown-intent disconnection (binary sensor `off`, `disconnected`, `islanded`) keeps the orange X with `DISCONNECTED`
 
