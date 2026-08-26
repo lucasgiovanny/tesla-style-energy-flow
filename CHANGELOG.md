@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.33 - 2026-08-26
 
 - Added an optional `entities.grid_status` sensor for a Tesla-app-style grid outage indicator: while the site is off-grid an orange X is shown on the grid line and all grid flow lines are suppressed. Works with the Powerwall grid status binary sensor (`on`/`off`) and Teslemetry / Tesla Fleet island status sensors (`off_grid_intentional`, `disconnected`, `islanded`, …), selectable from the card editor's Grid section
 
