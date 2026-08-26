@@ -85,6 +85,8 @@
         sensor_grid: 'Grid Power',
         sensor_grid_import: 'Potenza Importazione Rete',
         sensor_grid_export: 'Potenza Esportazione Rete',
+        sensor_grid_status: 'Stato Rete',
+        hint_grid_status: 'Mostra una X arancione sulla linea della rete quando la rete non e disponibile (stato off-grid del Powerwall).',
         sensor_battery: 'Battery Power',
         sensor_battery_charge: 'Potenza Carica Batteria',
         sensor_battery_discharge: 'Potenza Scarica Batteria',
@@ -175,6 +177,8 @@
         sensor_grid: 'Grid Power',
         sensor_grid_import: 'Grid Import Power',
         sensor_grid_export: 'Grid Export Power',
+        sensor_grid_status: 'Grid Status',
+        hint_grid_status: 'Shows an orange X on the grid line while the grid is down (Powerwall off-grid / island status).',
         sensor_battery: 'Battery Power',
         sensor_battery_charge: 'Battery Charge Power',
         sensor_battery_discharge: 'Battery Discharge Power',
@@ -265,6 +269,8 @@
         sensor_grid: 'Potencia Red',
         sensor_grid_import: 'Potencia Importacion Red',
         sensor_grid_export: 'Potencia Exportacion Red',
+        sensor_grid_status: 'Estado de la Red',
+        hint_grid_status: 'Muestra una X naranja en la linea de red cuando no hay red (estado off-grid del Powerwall).',
         sensor_battery: 'Potencia Bateria',
         sensor_battery_charge: 'Potencia Carga Bateria',
         sensor_battery_discharge: 'Potencia Descarga Bateria',
@@ -355,6 +361,8 @@
         sensor_grid: 'Puissance Reseau',
         sensor_grid_import: 'Puissance Importation Reseau',
         sensor_grid_export: 'Puissance Exportation Reseau',
+        sensor_grid_status: 'Etat du Reseau',
+        hint_grid_status: 'Affiche un X orange sur la ligne reseau quand le reseau est coupe (etat off-grid du Powerwall).',
         sensor_battery: 'Puissance Batterie',
         sensor_battery_charge: 'Puissance Charge Batterie',
         sensor_battery_discharge: 'Puissance Decharge Batterie',
@@ -445,6 +453,8 @@
         sensor_grid: 'Netzleistung',
         sensor_grid_import: 'Netzbezug (Einspeisung)',
         sensor_grid_export: 'Netzeinspeisung (Export)',
+        sensor_grid_status: 'Netzstatus',
+        hint_grid_status: 'Zeigt ein oranges X auf der Netzlinie, wenn das Netz getrennt ist (Powerwall Off-Grid-/Inselstatus).',
         sensor_battery: 'Batterieleistung',
         sensor_battery_charge: 'Batterie Ladeleistung',
         sensor_battery_discharge: 'Batterie Entladeleistung',
@@ -535,6 +545,8 @@
         sensor_grid: 'Potência da Rede',
         sensor_grid_import: 'Potência de Importação da Rede',
         sensor_grid_export: 'Potência de Exportação da Rede',
+        sensor_grid_status: 'Status da Rede',
+        hint_grid_status: 'Mostra um X laranja na linha da rede quando a rede cai (status off-grid do Powerwall).',
         sensor_battery: 'Potência da Bateria',
         sensor_battery_charge: 'Potência de Carga da Bateria',
         sensor_battery_discharge: 'Potência de Descarga da Bateria',
@@ -625,6 +637,8 @@
         sensor_grid: 'Potência da Rede',
         sensor_grid_import: 'Potência de Importação da Rede',
         sensor_grid_export: 'Potência de Exportação da Rede',
+        sensor_grid_status: 'Estado da Rede',
+        hint_grid_status: 'Mostra um X laranja na linha da rede quando a rede falha (estado off-grid da Powerwall).',
         sensor_battery: 'Potência da Bateria',
         sensor_battery_charge: 'Potência de Carga da Bateria',
         sensor_battery_discharge: 'Potência de Descarga da Bateria',
@@ -1303,6 +1317,7 @@
       grid_power: '',
       grid_import_power: '',
       grid_export_power: '',
+      grid_status: '',
       battery_power: '',
       battery_charge_power: '',
       battery_discharge_power: '',
@@ -1558,6 +1573,26 @@
     return true;
   }
 
+  // Grid connection status, Tesla-app style. Powerwall exposes it either as a
+  // binary_sensor (on = grid connected, off = outage) or as an enum/text sensor
+  // (Teslemetry island status: 'on_grid', 'off_grid_intentional', …; local
+  // Powerwall API: 'Connected', 'Islanded', 'Disconnected intentionally').
+  // Unknown/unavailable states count as connected so a flaky sensor never
+  // paints a false outage.
+  function isGridOutageState(entityState) {
+    if (!entityState) return false;
+    const state = String(entityState.state || '').trim().toLowerCase();
+    if (!state || ['unknown', 'unavailable', 'none', 'null'].includes(state)) return false;
+    if (state === 'off') return true;
+    return (
+      state.includes('disconnect') ||
+      state.includes('islanded') ||
+      state.includes('off_grid') ||
+      state.includes('off-grid') ||
+      state.includes('outage')
+    );
+  }
+
   function friendlyEntityName(entityState) {
     const name = String(entityState?.attributes?.friendly_name || '').trim();
     return name || '';
@@ -1659,7 +1694,7 @@
       const e = (this._config && this._config.entities) || {};
       this._trackedIdsCache = [
         e.solar_power,
-        e.grid_power, e.grid_import_power, e.grid_export_power,
+        e.grid_power, e.grid_import_power, e.grid_export_power, e.grid_status,
         e.battery_power, e.battery_charge_power, e.battery_discharge_power, e.battery_level,
         e.roof_a_power, e.roof_a_voltage, e.roof_a_current,
         e.roof_b_power, e.roof_b_voltage, e.roof_b_current,
@@ -1783,6 +1818,37 @@
       el.classList.add('active', cls);
       el.classList.toggle('flow-reverse', !!reverse);
       this._pathLastActive[key] = true;
+    }
+
+    // Tesla-app-style outage X, anchored to the grid-side endpoint of the
+    // line-grid-load path so it follows scene profiles and user-customised
+    // geometry without needing its own per-scene coordinates.
+    _updateGridOutageMarker(outage) {
+      const marker = this._query('#grid-outage-marker');
+      if (!marker) return;
+      marker.classList.toggle('active', !!outage);
+      if (!outage) return;
+      const path = this._query('#line-grid-load');
+      if (!path) return;
+      let x = Number.NaN;
+      let y = Number.NaN;
+      if (typeof path.getPointAtLength === 'function') {
+        try {
+          const start = path.getPointAtLength(0);
+          x = start.x;
+          y = start.y;
+        } catch (_error) {
+          // Detached/zero-length path — fall through to parsing the d attribute.
+        }
+      }
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        const d = String(path.getAttribute('d') || '').trim();
+        const m = /^M\s*(-?\d+(?:\.\d+)?)[\s,]+(-?\d+(?:\.\d+)?)/i.exec(d);
+        if (!m) return;
+        x = parseFloat(m[1]);
+        y = parseFloat(m[2]);
+      }
+      marker.setAttribute('transform', `translate(${x}, ${y})`);
     }
 
     _dominantFlowClass(id, solarW, batteryW, gridW, fallback) {
@@ -2666,6 +2732,22 @@
           .hide-labels .flow-status {
             display: none;
           }
+          /* Tesla-app-style outage indicator: an orange X pinned to the grid
+             connection point while the site is off-grid. */
+          .grid-outage-marker {
+            display: none;
+          }
+          .grid-outage-marker.active {
+            display: inline;
+          }
+          .grid-outage-marker line {
+            stroke: #fb923c;
+            stroke-width: 3.2;
+            stroke-linecap: round;
+            filter: drop-shadow(0 0 0.6px rgba(2, 8, 23, 0.95))
+                    drop-shadow(0 0 4px rgba(251, 146, 60, 0.65))
+                    drop-shadow(0 0 10px rgba(251, 146, 60, 0.4));
+          }
           /* Pause CSS animations when the card is scrolled out of view.
              Toggled by an IntersectionObserver on the host element. */
           :host(.flow-offscreen) .flow-line.active {
@@ -2719,6 +2801,11 @@
                 <path id="line-solar-grid" class="flow-line" d="${pathD('line-solar-grid', 'line_solar_grid')}"></path>
                 <path id="line-solar-battery" class="flow-line" d="${pathD('line-solar-battery', 'line_solar_battery')}"></path>
                 <path id="line-grid-battery" class="flow-line" d="${pathD('line-grid-battery', 'line_grid_battery')}"></path>
+
+                <g id="grid-outage-marker" class="grid-outage-marker" transform="translate(434, 402)">
+                  <line x1="-5.5" y1="-5.5" x2="5.5" y2="5.5"></line>
+                  <line x1="-5.5" y1="5.5" x2="5.5" y2="-5.5"></line>
+                </g>
 
                 <g class="flow-node" transform="translate(286, 155)">
                   <circle class="flow-node-bg" id="node-solar-bg" cx="0" cy="0" r="5"></circle>
@@ -2813,6 +2900,7 @@
           console.warn('[tesla-style-energy-flow] grid_invert is ignored because grid_import_power / grid_export_power are configured. Remove grid_invert from your YAML.');
         }
       }
+      const gridOutage = isGridOutageState(this._entityState(cfg.entities.grid_status));
       const roofAPower = this._smooth('roof_a', toWatt(this._entityState(cfg.entities.roof_a_power)));
       const roofAVoltage = safeNum(this._entityState(cfg.entities.roof_a_voltage)?.state, 0);
       const roofACurrent = safeNum(this._entityState(cfg.entities.roof_a_current)?.state, 0);
@@ -2923,6 +3011,7 @@
       this._setBackground(sceneHref);
       this._applySceneFlowPaths(sceneHref);
       this._applySceneFlowComponents(sceneHref);
+      this._updateGridOutageMarker(gridOutage);
 
       this._setText('#flow-solar-power', this._formatKW(solarPower));
       this._setText('#flow-grid-power', this._formatKW(gridPower));
@@ -2959,7 +3048,7 @@
       }
 
       this._toggleNode('#node-solar-bg', solarPower > solarMin);
-      this._toggleNode('#node-grid-bg', Math.abs(gridPower) > gridMin);
+      this._toggleNode('#node-grid-bg', !gridOutage && Math.abs(gridPower) > gridMin);
       this._toggleNode('#node-load-bg', loadPower > homeMin);
       this._toggleNode('#node-battery-bg', batteryConfigured && Math.abs(batteryPower) > batteryMin);
       this._toggleNode('#node-ev-bg', (ev1.power || 0) > 0 || ev1.switchOn || ev1.present);
@@ -3034,27 +3123,34 @@
       }
 
       this._activatePath('line-solar-load', 'flow-solar', solarToLoad, solarMin);
-      // line-grid-load: forward = grid imports to home junction; reverse = battery exports via junction to grid.
-      // Only activate one direction at a time to avoid the two calls overwriting each other's flow-reverse flag.
-      if (batteryToGrid >= Math.max(1, Math.min(gridMin, batteryMin)) && gridImportVisual < gridMin) {
-        // Battery is exporting to grid and grid is NOT simultaneously importing above threshold:
-        // show battery→junction→grid (reverse on this path)
-        this._activatePath('line-grid-load', 'flow-green', batteryToGrid, Math.max(1, Math.min(gridMin, batteryMin)), true);
-      } else {
-        // Normal grid import (or both: grid import dominates, battery export is low/zero)
-        this._activatePath('line-grid-load', 'flow-broken', gridImportVisual, gridMin);
+      // While off-grid nothing can cross the grid connection, so every
+      // grid-touching path stays dark even if a lagging power sensor still
+      // reports a flow — otherwise a stream would animate through the outage X.
+      if (!gridOutage) {
+        // line-grid-load: forward = grid imports to home junction; reverse = battery exports via junction to grid.
+        // Only activate one direction at a time to avoid the two calls overwriting each other's flow-reverse flag.
+        if (batteryToGrid >= Math.max(1, Math.min(gridMin, batteryMin)) && gridImportVisual < gridMin) {
+          // Battery is exporting to grid and grid is NOT simultaneously importing above threshold:
+          // show battery→junction→grid (reverse on this path)
+          this._activatePath('line-grid-load', 'flow-green', batteryToGrid, Math.max(1, Math.min(gridMin, batteryMin)), true);
+        } else {
+          // Normal grid import (or both: grid import dominates, battery export is low/zero)
+          this._activatePath('line-grid-load', 'flow-broken', gridImportVisual, gridMin);
+        }
       }
       const battLoadThreshold = Math.max(1, Math.min(gridMin, batteryMin));
-      this._activatePath('line-battery-load', 'flow-green', Math.max(battToLoad, batteryToGrid), battLoadThreshold);
+      this._activatePath('line-battery-load', 'flow-green', Math.max(battToLoad, gridOutage ? 0 : batteryToGrid), battLoadThreshold);
 
       const homeTotal = solarToLoad + battToLoad + gridToLoadVisual;
       const homeCls = this._dominantFlowClass('home', solarToLoad, battToLoad, gridToLoadVisual, 'flow-solar');
       this._activatePath('line-junction-home-load', homeCls, homeTotal, homeMin);
 
       this._activatePath('line-solar-battery', 'flow-solar', solarToBattery, batteryMin);
-      this._activatePath('line-grid-battery', 'flow-broken', gridToBattery, batteryMin);
-      // line-solar-grid: only solar export; battery→grid is shown via line-battery-load + line-grid-load (reverse)
-      this._activatePath('line-solar-grid', 'flow-green', solarExport, Math.max(1, gridMin));
+      if (!gridOutage) {
+        this._activatePath('line-grid-battery', 'flow-broken', gridToBattery, batteryMin);
+        // line-solar-grid: only solar export; battery→grid is shown via line-battery-load + line-grid-load (reverse)
+        this._activatePath('line-solar-grid', 'flow-green', solarExport, Math.max(1, gridMin));
+      }
 
       const evTotal = solarToEv + battToEv + gridToEv;
       // Mirror the line-solar-grid convention (always green when solar
@@ -3811,6 +3907,22 @@
       const pctIds = (path) => this._sensorIdsByUnitOrClass(['%'], ['battery'], String(this._getByPath(path) || ''));
       const voltIds = (path) => this._sensorIdsByUnitOrClass(['V'], ['voltage'], String(this._getByPath(path) || ''));
       const ampIds = (path) => this._sensorIdsByUnitOrClass(['A'], ['current'], String(this._getByPath(path) || ''));
+      // Grid connection status: binary_sensors plus enum/grid-ish sensors
+      // (Powerwall grid status, Teslemetry island status, …).
+      const gridStatusIds = (() => {
+        const current = String(this._getByPath('entities.grid_status') || '');
+        if (!this._hass) return current ? [current] : [];
+        return Object.keys(this._hass.states)
+          .filter((id) => {
+            if (id === current) return true;
+            const domain = id.split('.')[0];
+            if (domain === 'binary_sensor') return true;
+            if (domain !== 'sensor') return false;
+            const attrs = this._hass.states[id]?.attributes || {};
+            return attrs.device_class === 'enum' || /grid|island/.test(id);
+          })
+          .sort((a, b) => a.localeCompare(b));
+      })();
 
       this.shadowRoot.innerHTML = `
         <style>
@@ -4336,6 +4448,10 @@
               ${this._entitySelectRow(this._t('editor.sensor_grid_import', 'Grid Import Power'), 'entities.grid_import_power', powerIds('entities.grid_import_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
               ${this._entitySelectRow(this._t('editor.sensor_grid_export', 'Grid Export Power'), 'entities.grid_export_power', powerIds('entities.grid_export_power'), this._t('editor.placeholder_sensor', '-- select sensor --'))}
               ${(cfg.entities?.grid_import_power || cfg.entities?.grid_export_power) ? `<span class="note">grid_invert not needed when using separate import/export sensors</span>` : ''}
+              <hr class="group-divider">
+              <span class="group-label">Grid connection status (optional)</span>
+              ${this._entitySelectRow(this._t('editor.sensor_grid_status', 'Grid Status'), 'entities.grid_status', gridStatusIds, this._t('editor.placeholder_sensor', '-- select sensor --'))}
+              <span class="note">${this._t('editor.hint_grid_status', 'Shows an orange X on the grid line while the grid is down (Powerwall off-grid / island status).')}</span>
             </div>
           </div>
 

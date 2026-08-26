@@ -13,6 +13,7 @@ thresholds:
 entities:
   solar_power: sensor.solar_power
   grid_power: sensor.grid_power
+  # grid_status: binary_sensor.powerwall_grid_status  # optional: orange X on the grid line during an outage
   battery_power: sensor.battery_power
   load_power: sensor.home_load_power
   battery_level: sensor.battery_level

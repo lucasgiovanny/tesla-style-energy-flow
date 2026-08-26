@@ -40,6 +40,7 @@ Custom Home Assistant Lovelace card for energy flows on a house scene, with dyna
 - Optional `roof_a_label` / `roof_b_label` for custom PV array names
 - Optional `ev_presence` / `ev2_presence` to show the EV scene when a vehicle is at home, even if it is not charging
 - Optional `scene_path_map` and `scene_component_map` overrides for custom dual-EV backgrounds
+- Optional `grid_status` entity for a Tesla-app-style **grid outage indicator** — an orange X on the grid line while the site is off-grid (Powerwall `binary_sensor` grid status or Teslemetry/Tesla Fleet island status)
 - Config editor with entity dropdowns
 - Multilanguage UI (`auto`, `it`, `en`, `es`, `fr`, `de`, `pt-BR`, `pt-PT`)
   - `pt-BR` (Brazilian Portuguese) and `pt-PT` (European Portuguese) are separate bundles;
@@ -117,6 +118,8 @@ entities:
   roof_b_voltage: sensor.roof_array_b_voltage
   roof_b_current: sensor.roof_array_b_current
   grid_power: sensor.grid_power
+  # Optional grid connection status — shows an orange X on the grid line during an outage
+  # grid_status: binary_sensor.powerwall_grid_status
   battery_power: sensor.battery_power
   load_power: sensor.home_load_power
   battery_level: sensor.battery_level
@@ -156,6 +159,24 @@ For custom dual-EV scenes you can also override per-scene geometry through:
 
 - `scene_path_map`
 - `scene_component_map`
+
+### Grid outage indicator
+
+Set the optional `entities.grid_status` to your grid connection status entity and the
+card shows an orange X on the grid line while the site is off-grid, like the Tesla app:
+
+```yaml
+entities:
+  grid_status: binary_sensor.powerwall_grid_status
+```
+
+Recognized as **off-grid**: `off` (binary sensors, where `on` = connected), and any
+state containing `disconnect`, `islanded`, `off_grid` / `off-grid`, or `outage` —
+covering the Powerwall integration's grid status binary sensor and the
+Teslemetry / Tesla Fleet island status sensors (`off_grid_intentional`,
+`off_grid_unintentional`, …). Anything else — including `unknown` / `unavailable` —
+counts as connected. During an outage the card also suppresses all grid flow lines,
+so no energy stream animates through the X.
 
 ## Troubleshooting
 

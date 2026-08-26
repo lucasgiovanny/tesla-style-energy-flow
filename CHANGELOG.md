@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added an optional `entities.grid_status` sensor for a Tesla-app-style grid outage indicator: while the site is off-grid an orange X is shown on the grid line and all grid flow lines are suppressed. Works with the Powerwall grid status binary sensor (`on`/`off`) and Teslemetry / Tesla Fleet island status sensors (`off_grid_intentional`, `disconnected`, `islanded`, …), selectable from the card editor's Grid section
+
 ## 0.3.32 - 2026-08-24
 
 - Changed the scene corner radius to follow the active theme through `--ha-card-border-radius` instead of a hardcoded `16px`, so a theme with square cards no longer shows a rounded scene and a theme with a larger radius no longer mismatches the card around it
