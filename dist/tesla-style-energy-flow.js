@@ -3990,8 +3990,12 @@
       const pctIds = (path) => this._sensorIdsByUnitOrClass(['%'], ['battery'], String(this._getByPath(path) || ''));
       const voltIds = (path) => this._sensorIdsByUnitOrClass(['V'], ['voltage'], String(this._getByPath(path) || ''));
       const ampIds = (path) => this._sensorIdsByUnitOrClass(['A'], ['current'], String(this._getByPath(path) || ''));
-      // Grid connection status: binary_sensors plus enum/grid-ish sensors
-      // (Powerwall grid status, Teslemetry island status, …).
+      // Grid connection status: binary_sensors plus any text-state sensor.
+      // Tesla exposes grid status as a plain sensor with states like
+      // 'Connected' / 'Disconnected intentionally' — often without a
+      // device_class and with an entity_id that doesn't mention "grid", so
+      // filtering by id or device_class alone hides it. Numeric sensors
+      // (power, energy, …) stay excluded to keep the dropdown readable.
       const gridStatusIds = (() => {
         const current = String(this._getByPath('entities.grid_status') || '');
         if (!this._hass) return current ? [current] : [];
@@ -4001,8 +4005,11 @@
             const domain = id.split('.')[0];
             if (domain === 'binary_sensor') return true;
             if (domain !== 'sensor') return false;
-            const attrs = this._hass.states[id]?.attributes || {};
-            return attrs.device_class === 'enum' || /grid|island/.test(id);
+            const st = this._hass.states[id];
+            const attrs = st?.attributes || {};
+            if (attrs.device_class === 'enum' || /grid|island/.test(id)) return true;
+            if (attrs.device_class === 'timestamp' || attrs.device_class === 'date') return false;
+            return !Number.isFinite(parseFloat(st?.state));
           })
           .sort((a, b) => a.localeCompare(b));
       })();

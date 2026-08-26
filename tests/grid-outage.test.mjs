@@ -88,6 +88,15 @@ assert.match(
   'the marker update should set a per-kind status word and re-anchor the X to line-grid-load'
 );
 
+// The editor dropdown must list text-state sensors (Tesla's grid status has
+// no device_class and often no "grid" in the entity_id), not only
+// binary_sensors and enum/grid-named sensors.
+assert.match(
+  source,
+  /const gridStatusIds = [\s\S]*if \(domain === 'binary_sensor'\) return true;[\s\S]*return !Number\.isFinite\(parseFloat\(st\?\.state\)\);/,
+  'the grid status dropdown should include any non-numeric-state sensor'
+);
+
 // grid_status must be part of the config schema and the tracked-entity list.
 assert.match(source, /grid_status: '',/, 'DEFAULT_CONFIG.entities should include grid_status');
 assert.match(

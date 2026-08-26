@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the Grid Status editor dropdown hiding Tesla's grid status sensor: it now lists any sensor with a text state (e.g. `Connected` / `Disconnected intentionally`) alongside binary_sensors, instead of only enum sensors and entity_ids containing `grid`/`island`. Numeric sensors (power, energy, …) stay excluded
+
 ## 0.3.34 - 2026-08-26
 
 - The grid outage indicator now distinguishes why the site is off-grid: a real grid failure (`off_grid_unintentional`, `outage`) shows a red X with a localized `GRID OUTAGE` status word under the grid value, an intentional off-grid mode (`off_grid_intentional`, `Disconnected intentionally`) keeps the orange X with `OFF-GRID`, and an unknown-intent disconnection (binary sensor `off`, `disconnected`, `islanded`) keeps the orange X with `DISCONNECTED`
