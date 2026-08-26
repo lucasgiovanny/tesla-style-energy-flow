@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.35 - 2026-08-26
 
 - Fixed the Grid Status editor dropdown hiding Tesla's grid status sensor: it now lists any sensor with a text state (e.g. `Connected` / `Disconnected intentionally`) alongside binary_sensors, instead of only enum sensors and entity_ids containing `grid`/`island`. Numeric sensors (power, energy, …) stay excluded
 
