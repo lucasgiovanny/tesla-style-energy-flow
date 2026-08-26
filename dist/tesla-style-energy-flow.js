@@ -61,7 +61,10 @@
           off: 'OFF',
           producing: 'IN PRODUZIONE',
           charging: 'IN CARICA',
-          discharging: 'IN SCARICA'
+          discharging: 'IN SCARICA',
+          off_grid: 'FUORI RETE',
+          grid_outage: 'BLACKOUT',
+          disconnected: 'DISCONNESSA'
         }
       },
       editor: {
@@ -153,7 +156,10 @@
           off: 'OFF',
           producing: 'PRODUCING',
           charging: 'CHARGING',
-          discharging: 'DISCHARGING'
+          discharging: 'DISCHARGING',
+          off_grid: 'OFF-GRID',
+          grid_outage: 'GRID OUTAGE',
+          disconnected: 'DISCONNECTED'
         }
       },
       editor: {
@@ -245,7 +251,10 @@
           off: 'OFF',
           producing: 'PRODUCIENDO',
           charging: 'CARGANDO',
-          discharging: 'DESCARGANDO'
+          discharging: 'DESCARGANDO',
+          off_grid: 'FUERA DE RED',
+          grid_outage: 'APAGON',
+          disconnected: 'DESCONECTADA'
         }
       },
       editor: {
@@ -337,7 +346,10 @@
           off: 'OFF',
           producing: 'PRODUCTION',
           charging: 'CHARGE',
-          discharging: 'DECHARGE'
+          discharging: 'DECHARGE',
+          off_grid: 'HORS RESEAU',
+          grid_outage: 'COUPURE RESEAU',
+          disconnected: 'DECONNECTE'
         }
       },
       editor: {
@@ -429,7 +441,10 @@
           off: 'OFF',
           producing: 'ERZEUGUNG',
           charging: 'LADUNG',
-          discharging: 'ENTLADUNG'
+          discharging: 'ENTLADUNG',
+          off_grid: 'INSELBETRIEB',
+          grid_outage: 'STROMAUSFALL',
+          disconnected: 'GETRENNT'
         }
       },
       editor: {
@@ -521,7 +536,10 @@
           off: 'OFF',
           producing: 'PRODUZINDO',
           charging: 'CARREGANDO',
-          discharging: 'DESCARREGANDO'
+          discharging: 'DESCARREGANDO',
+          off_grid: 'FORA DA REDE',
+          grid_outage: 'QUEDA DE ENERGIA',
+          disconnected: 'DESCONECTADA'
         }
       },
       editor: {
@@ -613,7 +631,10 @@
           off: 'OFF',
           producing: 'A PRODUZIR',
           charging: 'A CARREGAR',
-          discharging: 'A DESCARREGAR'
+          discharging: 'A DESCARREGAR',
+          off_grid: 'FORA DA REDE',
+          grid_outage: 'FALHA DE REDE',
+          disconnected: 'DESLIGADA'
         }
       },
       editor: {
@@ -1577,20 +1598,28 @@
   // binary_sensor (on = grid connected, off = outage) or as an enum/text sensor
   // (Teslemetry island status: 'on_grid', 'off_grid_intentional', …; local
   // Powerwall API: 'Connected', 'Islanded', 'Disconnected intentionally').
+  // Returns '' while connected, otherwise the kind of outage:
+  //   'unintentional' — the grid failed (blackout)
+  //   'intentional'   — the user chose off-grid mode in the Tesla app
+  //   'disconnected'  — off-grid with unknown intent (e.g. a binary_sensor)
   // Unknown/unavailable states count as connected so a flaky sensor never
   // paints a false outage.
-  function isGridOutageState(entityState) {
-    if (!entityState) return false;
+  function gridOutageKind(entityState) {
+    if (!entityState) return '';
     const state = String(entityState.state || '').trim().toLowerCase();
-    if (!state || ['unknown', 'unavailable', 'none', 'null'].includes(state)) return false;
-    if (state === 'off') return true;
-    return (
+    if (!state || ['unknown', 'unavailable', 'none', 'null'].includes(state)) return '';
+    const offGrid =
+      state === 'off' ||
       state.includes('disconnect') ||
       state.includes('islanded') ||
       state.includes('off_grid') ||
       state.includes('off-grid') ||
-      state.includes('outage')
-    );
+      state.includes('outage');
+    if (!offGrid) return '';
+    // 'unintentional' first — it contains 'intentional' as a substring.
+    if (state.includes('unintentional') || state.includes('outage')) return 'unintentional';
+    if (state.includes('intentional')) return 'intentional';
+    return 'disconnected';
   }
 
   function friendlyEntityName(entityState) {
@@ -1822,12 +1851,37 @@
 
     // Tesla-app-style outage X, anchored to the grid-side endpoint of the
     // line-grid-load path so it follows scene profiles and user-customised
-    // geometry without needing its own per-scene coordinates.
-    _updateGridOutageMarker(outage) {
+    // geometry without needing its own per-scene coordinates. kind is the
+    // gridOutageKind() classification ('' while connected) and drives the
+    // marker colour plus a status word under the grid kW value.
+    _updateGridOutageMarker(kind) {
+      const unintentional = kind === 'unintentional';
+      const status = this._query('#flow-grid-status');
+      if (status) {
+        status.classList.toggle('outage-visible', !!kind);
+        status.classList.toggle('outage-unintentional', unintentional);
+        if (kind) {
+          const statusKey = unintentional
+            ? 'card.status.grid_outage'
+            : (kind === 'intentional' ? 'card.status.off_grid' : 'card.status.disconnected');
+          const statusFallback = unintentional
+            ? 'GRID OUTAGE'
+            : (kind === 'intentional' ? 'OFF-GRID' : 'DISCONNECTED');
+          this._setText('#flow-grid-status', this._t(statusKey, statusFallback));
+          // Column-align the status word under the scene-positioned kW value.
+          const power = this._query('#flow-grid-power');
+          if (power) {
+            const fontScale = clamp(safeNum(this._config.font_scale, 1), 0.75, 1.35);
+            status.setAttribute('x', power.getAttribute('x') || '6');
+            status.setAttribute('y', String(safeNum(power.getAttribute('y'), 85) + Math.round(17 * fontScale)));
+          }
+        }
+      }
       const marker = this._query('#grid-outage-marker');
       if (!marker) return;
-      marker.classList.toggle('active', !!outage);
-      if (!outage) return;
+      marker.classList.toggle('active', !!kind);
+      marker.classList.toggle('outage-unintentional', unintentional);
+      if (!kind) return;
       const path = this._query('#line-grid-load');
       if (!path) return;
       let x = Number.NaN;
@@ -2732,8 +2786,9 @@
           .hide-labels .flow-status {
             display: none;
           }
-          /* Tesla-app-style outage indicator: an orange X pinned to the grid
-             connection point while the site is off-grid. */
+          /* Tesla-app-style outage indicator: an X pinned to the grid
+             connection point while the site is off-grid. Orange = deliberate
+             or unknown-intent disconnection, red = the grid actually failed. */
           .grid-outage-marker {
             display: none;
           }
@@ -2747,6 +2802,34 @@
             filter: drop-shadow(0 0 0.6px rgba(2, 8, 23, 0.95))
                     drop-shadow(0 0 4px rgba(251, 146, 60, 0.65))
                     drop-shadow(0 0 10px rgba(251, 146, 60, 0.4));
+          }
+          .grid-outage-marker.outage-unintentional line {
+            stroke: #ff5d73;
+            filter: drop-shadow(0 0 0.6px rgba(2, 8, 23, 0.95))
+                    drop-shadow(0 0 4px rgba(255, 93, 115, 0.65))
+                    drop-shadow(0 0 10px rgba(255, 93, 115, 0.4));
+          }
+          /* Outage status word under the grid kW value. The id + !important
+             override the generic .flow-status display:none and the grayed-out
+             .flow-node.inactive text styling (the grid node is forced inactive
+             while off-grid). */
+          #flow-grid-status.outage-visible,
+          .flow-node.inactive #flow-grid-status.outage-visible {
+            display: inline;
+            fill: #fb923c !important;
+            opacity: 0.95;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-shadow: 0 1px 2px rgba(2, 6, 23, 0.55);
+            filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.95))
+                    drop-shadow(0 0 10px rgba(0, 0, 0, 0.78));
+          }
+          #flow-grid-status.outage-visible.outage-unintentional,
+          .flow-node.inactive #flow-grid-status.outage-visible.outage-unintentional {
+            fill: #ff5d73 !important;
+          }
+          .hide-labels #flow-grid-status.outage-visible {
+            display: none;
           }
           /* Pause CSS animations when the card is scrolled out of view.
              Toggled by an IntersectionObserver on the host element. */
@@ -2900,7 +2983,7 @@
           console.warn('[tesla-style-energy-flow] grid_invert is ignored because grid_import_power / grid_export_power are configured. Remove grid_invert from your YAML.');
         }
       }
-      const gridOutage = isGridOutageState(this._entityState(cfg.entities.grid_status));
+      const gridOutage = gridOutageKind(this._entityState(cfg.entities.grid_status));
       const roofAPower = this._smooth('roof_a', toWatt(this._entityState(cfg.entities.roof_a_power)));
       const roofAVoltage = safeNum(this._entityState(cfg.entities.roof_a_voltage)?.state, 0);
       const roofACurrent = safeNum(this._entityState(cfg.entities.roof_a_current)?.state, 0);

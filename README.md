@@ -178,6 +178,16 @@ Teslemetry / Tesla Fleet island status sensors (`off_grid_intentional`,
 counts as connected. During an outage the card also suppresses all grid flow lines,
 so no energy stream animates through the X.
 
+The indicator distinguishes *why* the site is off-grid:
+
+| State examples | X color | Status word (localized) |
+| --- | --- | --- |
+| `off_grid_unintentional`, `outage` — the grid failed | red | `GRID OUTAGE` |
+| `off_grid_intentional`, `Disconnected intentionally` — off-grid mode chosen in the Tesla app | orange | `OFF-GRID` |
+| `off`, `disconnected`, `islanded` — off-grid, intent unknown | orange | `DISCONNECTED` |
+
+The status word appears under the grid kW value and follows `show_labels`.
+
 ## Troubleshooting
 
 ### The grid → battery line disappears while the car is charging

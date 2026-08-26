@@ -24,37 +24,38 @@ function sliceBalanced(marker, open, close) {
   throw new Error(`unbalanced "${open}" after "${marker}"`);
 }
 
-const { isGridOutageState } = new Function(`
-  ${sliceBalanced('function isGridOutageState(', '{', '}')}
-  return { isGridOutageState };
+const { gridOutageKind } = new Function(`
+  ${sliceBalanced('function gridOutageKind(', '{', '}')}
+  return { gridOutageKind };
 `)();
 
-const outage = (state) => isGridOutageState({ state });
+const kind = (state) => gridOutageKind({ state });
 
-// Powerwall integration binary_sensor: on = grid connected, off = outage.
-assert.equal(outage('off'), true);
-assert.equal(outage('on'), false);
+// Powerwall integration binary_sensor: on = grid connected, off = outage
+// with unknown intent.
+assert.equal(kind('off'), 'disconnected');
+assert.equal(kind('on'), '');
 
 // Teslemetry / Tesla Fleet island status enum sensor.
-assert.equal(outage('on_grid'), false);
-assert.equal(outage('off_grid'), true);
-assert.equal(outage('off_grid_intentional'), true);
-assert.equal(outage('off_grid_unintentional'), true);
-assert.equal(outage('island_status_unknown'), false);
+assert.equal(kind('on_grid'), '');
+assert.equal(kind('off_grid'), 'disconnected');
+assert.equal(kind('off_grid_intentional'), 'intentional');
+assert.equal(kind('off_grid_unintentional'), 'unintentional');
+assert.equal(kind('island_status_unknown'), '');
 
 // Local Powerwall API / logbook-style textual states.
-assert.equal(outage('Connected'), false);
-assert.equal(outage('Disconnected'), true);
-assert.equal(outage('Disconnected intentionally'), true);
-assert.equal(outage('Islanded'), true);
-assert.equal(outage('SystemIslandedActive'), true);
-assert.equal(outage('outage'), true);
+assert.equal(kind('Connected'), '');
+assert.equal(kind('Disconnected'), 'disconnected');
+assert.equal(kind('Disconnected intentionally'), 'intentional');
+assert.equal(kind('Islanded'), 'disconnected');
+assert.equal(kind('SystemIslandedActive'), 'disconnected');
+assert.equal(kind('outage'), 'unintentional');
 
 // A missing or flaky sensor must never paint a false outage.
-assert.equal(isGridOutageState(null), false);
-assert.equal(outage(''), false);
-assert.equal(outage('unknown'), false);
-assert.equal(outage('unavailable'), false);
+assert.equal(gridOutageKind(null), '');
+assert.equal(kind(''), '');
+assert.equal(kind('unknown'), '');
+assert.equal(kind('unavailable'), '');
 
 // The outage X must exist in the static SVG and stay hidden by default.
 assert.match(
@@ -68,11 +69,23 @@ assert.match(
   'the outage X should be hidden until the grid status entity reports an outage'
 );
 
-// The marker follows the scene-specific grid line geometry.
+// Severity styling: orange X by default, red for an actual grid failure.
 assert.match(
   source,
-  /_updateGridOutageMarker\(outage\) \{[\s\S]*getPointAtLength\(0\)[\s\S]*marker\.setAttribute\('transform', `translate\(\$\{x\}, \$\{y\}\)`\);/,
-  'the outage X should be re-anchored to the grid-side endpoint of line-grid-load on every render'
+  /\.grid-outage-marker\.outage-unintentional line \{\s*stroke: #ff5d73;/,
+  'an unintentional outage should turn the X red'
+);
+assert.match(
+  source,
+  /#flow-grid-status\.outage-visible\.outage-unintentional,[\s\S]*fill: #ff5d73 !important;/,
+  'the outage status word should turn red for an unintentional outage'
+);
+
+// The status word appears under the grid kW value with a per-kind label.
+assert.match(
+  source,
+  /_updateGridOutageMarker\(kind\) \{[\s\S]*'card\.status\.grid_outage'[\s\S]*'card\.status\.off_grid'[\s\S]*'card\.status\.disconnected'[\s\S]*getPointAtLength\(0\)[\s\S]*marker\.setAttribute\('transform', `translate\(\$\{x\}, \$\{y\}\)`\);/,
+  'the marker update should set a per-kind status word and re-anchor the X to line-grid-load'
 );
 
 // grid_status must be part of the config schema and the tracked-entity list.

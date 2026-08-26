@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The grid outage indicator now distinguishes why the site is off-grid: a real grid failure (`off_grid_unintentional`, `outage`) shows a red X with a localized `GRID OUTAGE` status word under the grid value, an intentional off-grid mode (`off_grid_intentional`, `Disconnected intentionally`) keeps the orange X with `OFF-GRID`, and an unknown-intent disconnection (binary sensor `off`, `disconnected`, `islanded`) keeps the orange X with `DISCONNECTED`
+
 ## 0.3.33 - 2026-08-26
 
 - Added an optional `entities.grid_status` sensor for a Tesla-app-style grid outage indicator: while the site is off-grid an orange X is shown on the grid line and all grid flow lines are suppressed. Works with the Powerwall grid status binary sensor (`on`/`off`) and Teslemetry / Tesla Fleet island status sensors (`off_grid_intentional`, `disconnected`, `islanded`, …), selectable from the card editor's Grid section
