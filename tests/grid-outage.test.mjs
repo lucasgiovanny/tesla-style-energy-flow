@@ -81,7 +81,25 @@ assert.match(
   'the outage status word should turn red for an unintentional outage'
 );
 
-// The status word appears under the grid kW value with a per-kind label.
+// The status word takes over the grid label's row (which the scene profiles keep
+// inside the viewBox) instead of hanging a third line under the kW value.
+assert.match(
+  source,
+  /status\.setAttribute\('x', label\?\.getAttribute\('x'\)[\s\S]*status\.setAttribute\('y', String\(safeNum\(label\?\.getAttribute\('y'\)/,
+  'the outage word should be positioned on the grid label row'
+);
+assert.match(
+  source,
+  /if \(label\) label\.style\.display = kind \? 'none' : '';/,
+  'the plain grid caption should be hidden while the outage word occupies its row'
+);
+assert.match(
+  source,
+  /#flow-grid-status\.outage-visible,[\s\S]*font-size: calc\(10px \* var\(--flow-font-scale\)\);/,
+  'the outage word should use the grid label type size'
+);
+
+// The status word appears with a per-kind label.
 assert.match(
   source,
   /_updateGridOutageMarker\(kind\) \{[\s\S]*'card\.status\.grid_outage'[\s\S]*'card\.status\.off_grid'[\s\S]*'card\.status\.disconnected'[\s\S]*getPointAtLength\(0\)[\s\S]*marker\.setAttribute\('transform', `translate\(\$\{x\}, \$\{y\}\)`\);/,

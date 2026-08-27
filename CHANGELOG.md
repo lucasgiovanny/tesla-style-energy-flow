@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the grid outage word (`OFF-GRID` / `GRID OUTAGE` / `DISCONNECTED`) hanging as a third line under the grid kW value, where scene profiles that place the grid text low left it glued to — or clipped by — the bottom card edge. It now takes over the grid label's row, right under the outage X and above the kW value, in the label's type size
+
 ## 0.3.35 - 2026-08-26
 
 - Fixed the Grid Status editor dropdown hiding Tesla's grid status sensor: it now lists any sensor with a text state (e.g. `Connected` / `Disconnected intentionally`) alongside binary_sensors, instead of only enum sensors and entity_ids containing `grid`/`island`. Numeric sensors (power, energy, …) stay excluded

@@ -1853,10 +1853,11 @@
     // line-grid-load path so it follows scene profiles and user-customised
     // geometry without needing its own per-scene coordinates. kind is the
     // gridOutageKind() classification ('' while connected) and drives the
-    // marker colour plus a status word under the grid kW value.
+    // marker colour plus the outage word shown in place of the grid label.
     _updateGridOutageMarker(kind) {
       const unintentional = kind === 'unintentional';
       const status = this._query('#flow-grid-status');
+      const label = this._query('#flow-grid-label');
       if (status) {
         status.classList.toggle('outage-visible', !!kind);
         status.classList.toggle('outage-unintentional', unintentional);
@@ -1868,15 +1869,18 @@
             ? 'GRID OUTAGE'
             : (kind === 'intentional' ? 'OFF-GRID' : 'DISCONNECTED');
           this._setText('#flow-grid-status', this._t(statusKey, statusFallback));
-          // Column-align the status word under the scene-positioned kW value.
+          // The outage word takes over the grid label's row instead of hanging a
+          // third line under the kW value: the label row is the slot the scene
+          // profiles already keep clear of the outage X and inside the fitted
+          // viewBox, so the word no longer sits glued to the bottom card edge.
           const power = this._query('#flow-grid-power');
-          if (power) {
-            const fontScale = clamp(safeNum(this._config.font_scale, 1), 0.75, 1.35);
-            status.setAttribute('x', power.getAttribute('x') || '6');
-            status.setAttribute('y', String(safeNum(power.getAttribute('y'), 85) + Math.round(17 * fontScale)));
-          }
+          const powerY = safeNum(power?.getAttribute('y'), 85);
+          status.setAttribute('x', label?.getAttribute('x') || power?.getAttribute('x') || '6');
+          status.setAttribute('y', String(safeNum(label?.getAttribute('y'), powerY - 18)));
         }
       }
+      // Hide the plain "Grid" caption while the outage word occupies its row.
+      if (label) label.style.display = kind ? 'none' : '';
       const marker = this._query('#grid-outage-marker');
       if (!marker) return;
       marker.classList.toggle('active', !!kind);
@@ -2809,17 +2813,19 @@
                     drop-shadow(0 0 4px rgba(255, 93, 115, 0.65))
                     drop-shadow(0 0 10px rgba(255, 93, 115, 0.4));
           }
-          /* Outage status word under the grid kW value. The id + !important
-             override the generic .flow-status display:none and the grayed-out
-             .flow-node.inactive text styling (the grid node is forced inactive
-             while off-grid). */
+          /* Outage word rendered in the grid label's row (the label itself is
+             hidden while off-grid), so it matches the label's type metrics. The
+             id + !important override the generic .flow-status display:none and
+             the grayed-out .flow-node.inactive text styling (the grid node is
+             forced inactive while off-grid). */
           #flow-grid-status.outage-visible,
           .flow-node.inactive #flow-grid-status.outage-visible {
             display: inline;
             fill: #fb923c !important;
             opacity: 0.95;
+            font-size: calc(10px * var(--flow-font-scale));
             font-weight: 700;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.06em;
             text-shadow: 0 1px 2px rgba(2, 6, 23, 0.55);
             filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.95))
                     drop-shadow(0 0 10px rgba(0, 0, 0, 0.78));

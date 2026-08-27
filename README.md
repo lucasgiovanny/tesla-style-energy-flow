@@ -186,7 +186,9 @@ The indicator distinguishes *why* the site is off-grid:
 | `off_grid_intentional`, `Disconnected intentionally` — off-grid mode chosen in the Tesla app | orange | `OFF-GRID` |
 | `off`, `disconnected`, `islanded` — off-grid, intent unknown | orange | `DISCONNECTED` |
 
-The status word appears under the grid kW value and follows `show_labels`.
+The status word takes over the grid label's row — right under the X and above the
+kW value, so it always stays inside the scene instead of hanging off the bottom
+edge — and follows `show_labels`.
 
 ## Troubleshooting
 
