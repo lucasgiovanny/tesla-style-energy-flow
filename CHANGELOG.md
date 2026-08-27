@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Fixed position-editor edits appearing to do nothing on cards with `dynamic_background`: the editor opened on the scene from the static `background` while the card was rendering a weather/time-resolved scene, so every drag was saved to a scene the card never showed. The editor now opens on the scene the card is actually drawing (a manual pick in the scene dropdown still wins)
+- Fixed a dragged outage X being ignored when the drag was the only change in the config
+- Added an `Apply to all` button next to `Copy positions from` in the position editor: it copies the chosen scene's positions onto every scene in one go, instead of repeating the same layout twelve times. Components left automatic in the source (the outage word / X) are cleared on the targets so they go back to automatic there too
+
 ## 0.3.38 - 2026-08-27
 
 - Added the grid outage X to the visual position editor: it now has its own ring handle in the scene preview and `Outage X` X/Y fields in the Grid group, stored per scene as `grid-marker` in `scene_component_map`. Without a position it keeps riding the grid line's endpoint as before

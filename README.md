@@ -195,7 +195,11 @@ Both are draggable in **Edit visually** (the scene position editor): the word ha
 an orange text handle, the X an orange ring handle, and the Grid group has
 `Grid status` / `Outage X` number fields. Positions are stored per scene in
 `scene_component_map` as `grid-status` and `grid-marker`, relative to the grid
-node — drag either one and it stays exactly where you put it (a hand-placed word
+node. With `dynamic_background` the editor opens on the scene the card is
+currently rendering (not the static `background`), so edits land on the scene you
+see — switch scenes in the dropdown to lay out the others, or use
+**Copy positions from … → Apply to all** to push one scene's layout onto every
+scene at once — drag either one and it stays exactly where you put it (a hand-placed word
 is never auto-nudged); clear the entry to go back to automatic placement.
 
 ## Troubleshooting

@@ -155,7 +155,7 @@ assert.match(
 // grid column keeps it in the same column.
 assert.match(
   source,
-  /_configuredGridComponent\(componentKey\) \{[\s\S]*this\._config\.scene_component_map\?\.\[this\._lastAppliedSceneFlowComponentProfile\][\s\S]*scene\?\.\[componentKey\]/,
+  /_configuredGridComponent\(componentKey\) \{[\s\S]*this\._config\.scene_component_map\?\.\[sceneKey\][\s\S]*scene\?\.\[componentKey\]/,
   'an explicit scene_component_map entry should win over the automatic placement'
 );
 
@@ -164,6 +164,42 @@ assert.match(
   source,
   /_clearOutageWordFromMarker\(status, x, y\);/,
   'the outage word should be pushed clear of the X after the marker is placed'
+);
+
+// With a dynamic background the rendered scene is not the configured one, so the
+// card publishes what it draws and the editor opens on that scene — otherwise
+// every drag lands in a scene the user cannot see.
+assert.match(
+  source,
+  /RENDERED_SCENE_BY_CONFIG\.set\(configSceneFingerprint\(this\._config\), marker\);/,
+  'the card should publish the scene profile it is rendering'
+);
+assert.match(
+  source,
+  /_selectedPositionScene\(\) \{[\s\S]*this\._positionSceneKey\s*\|\|\s*this\._liveSceneKey\s*\|\|\s*sceneFileName\(this\._config\.background\)/,
+  'the editor should prefer a manual pick, then the live scene, then the background'
+);
+assert.match(
+  source,
+  /this\._activeSceneComponentKey = marker;/,
+  'the active scene key must be tracked even when no attribute changed'
+);
+assert.match(
+  source,
+  /const sceneKey = this\._activeSceneComponentKey \|\| this\._lastAppliedSceneFlowComponentProfile;/,
+  'grid overrides should be read from the actively rendered scene'
+);
+
+// One scene's layout can be pushed onto every scene at once.
+assert.match(
+  source,
+  /_copyScenePositionsToAll\(srcSceneKey\) \{[\s\S]*POSITION_EDITOR_SCENES\.forEach[\s\S]*AUTOMATIC_POSITION_COMPONENTS\.forEach/,
+  'copy-to-all should fan the source scene out and reset automatic components'
+);
+assert.match(
+  source,
+  /button\[data-copy-positions-all\][\s\S]*_copyScenePositionsToAll\(source\)/,
+  'the Apply to all button should be wired to the copy-to-all helper'
 );
 
 // The status word appears with a per-kind label.

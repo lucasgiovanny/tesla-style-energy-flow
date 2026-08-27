@@ -48,6 +48,26 @@
     half: 7.2,
     gap: 4
   });
+  // With a dynamic background the card renders whatever scene the weather/sun
+  // resolve to, which is rarely the configured `background`. Cards publish the
+  // scene they are actually drawing here so the position editor opens on it
+  // instead of sending every drag to a scene the user cannot see. Keyed by the
+  // identifying bits of the config, so a dashboard with several cards still
+  // matches the right one.
+  // Components with no per-scene defaults: absent means "place me automatically".
+  const AUTOMATIC_POSITION_COMPONENTS = Object.freeze(['grid-status', 'grid-marker']);
+  const RENDERED_SCENE_BY_CONFIG = new Map();
+  function configSceneFingerprint(config) {
+    const entities = config?.entities || {};
+    return JSON.stringify([
+      config?.title || '',
+      config?.background || '',
+      entities.solar_power || '',
+      entities.grid_power || '',
+      entities.load_power || '',
+      entities.battery_power || ''
+    ]);
+  }
   const I18N = Object.freeze({
     it: {
       card: {
@@ -133,6 +153,7 @@
         position_field_scene: 'Scena',
         position_copy_from: 'Copia posizioni da',
         position_copy_button: 'Applica',
+        position_copy_all_button: 'Applica a tutte',
         position_show_paths: 'Mostra tutte le linee',
         position_hide_paths: 'Nascondi le linee',
         position_paths_hint: 'Overlay statico di ogni linea di flusso per questa scena — verifica che ogni linea raggiunga i suoi nodi.',
@@ -230,6 +251,7 @@
         position_field_scene: 'Scene',
         position_copy_from: 'Copy positions from',
         position_copy_button: 'Apply',
+        position_copy_all_button: 'Apply to all',
         position_show_paths: 'Show all flow paths',
         position_hide_paths: 'Hide flow paths',
         position_paths_hint: 'Static overlay of every flow line for this scene — check each line reaches its nodes.',
@@ -327,6 +349,7 @@
         position_field_scene: 'Escena',
         position_copy_from: 'Copiar posiciones de',
         position_copy_button: 'Aplicar',
+        position_copy_all_button: 'Aplicar a todas',
         position_show_paths: 'Mostrar todas las líneas',
         position_hide_paths: 'Ocultar líneas',
         position_paths_hint: 'Superposición estática de cada línea de flujo de esta escena — comprueba que cada línea llega a sus nodos.',
@@ -424,6 +447,7 @@
         position_field_scene: 'Scene',
         position_copy_from: 'Copier positions depuis',
         position_copy_button: 'Appliquer',
+        position_copy_all_button: 'Appliquer a tout',
         position_show_paths: 'Afficher tous les flux',
         position_hide_paths: 'Masquer les flux',
         position_paths_hint: 'Superposition statique de chaque ligne de flux pour cette scène — vérifiez que chaque ligne atteint ses nœuds.',
@@ -521,6 +545,7 @@
         position_field_scene: 'Szene',
         position_copy_from: 'Positionen kopieren von',
         position_copy_button: 'Übernehmen',
+        position_copy_all_button: 'Auf alle anwenden',
         position_show_paths: 'Alle Flow-Linien zeigen',
         position_hide_paths: 'Flow-Linien ausblenden',
         position_paths_hint: 'Statisches Overlay aller Flow-Linien dieser Szene — prüfe, ob jede Linie ihre Knoten erreicht.',
@@ -618,6 +643,7 @@
         position_field_scene: 'Cena',
         position_copy_from: 'Copiar posições de',
         position_copy_button: 'Aplicar',
+        position_copy_all_button: 'Aplicar a todas',
         position_show_paths: 'Mostrar todas as linhas de fluxo',
         position_hide_paths: 'Ocultar linhas de fluxo',
         position_paths_hint: 'Sobreposição estática de todas as linhas de fluxo desta cena — verifique se cada linha alcança seus nós.',
@@ -715,6 +741,7 @@
         position_field_scene: 'Cena',
         position_copy_from: 'Copiar posições de',
         position_copy_button: 'Aplicar',
+        position_copy_all_button: 'Aplicar a todas',
         position_show_paths: 'Mostrar todas as linhas de fluxo',
         position_hide_paths: 'Ocultar linhas de fluxo',
         position_paths_hint: 'Sobreposição estática de todas as linhas de fluxo desta cena — verifique se cada linha chega aos seus nós.',
@@ -1953,7 +1980,8 @@
     }
 
     _configuredGridComponent(componentKey) {
-      const scene = this._config.scene_component_map?.[this._lastAppliedSceneFlowComponentProfile];
+      const sceneKey = this._activeSceneComponentKey || this._lastAppliedSceneFlowComponentProfile;
+      const scene = this._config.scene_component_map?.[sceneKey];
       return scene?.[componentKey] || null;
     }
 
@@ -2613,6 +2641,11 @@
       const map = this._sceneFlowComponentMap();
       const sceneProfile = map[sceneKey] || map['scene_day_clear_idle.png'];
       const marker = map[sceneKey] ? sceneKey : 'scene_day_clear_idle.png';
+      // Track the live scene unconditionally: _applyComponentProfile only records
+      // it when an attribute actually changed, so a config edit that moves
+      // nothing bound (the outage X) would otherwise leave this blank.
+      this._activeSceneComponentKey = marker;
+      RENDERED_SCENE_BY_CONFIG.set(configSceneFingerprint(this._config), marker);
       if (!sceneProfile) return;
       if (this._lastAppliedSceneFlowComponentProfile !== marker) {
         this._applyComponentProfile(sceneProfile, marker);
@@ -3385,9 +3418,11 @@
       this._editingPath = '';
       this._positionDrag = null;
       this._positionEditorOpen = false;
-      // Empty so _selectedPositionScene() falls back to the user's configured
-      // background — opening the editor lands on the scene they actually see.
+      // Empty until the user picks a scene; _selectedPositionScene() then uses
+      // the scene the card is actually rendering (see _liveSceneKey), falling
+      // back to the configured background.
       this._positionSceneKey = '';
+      this._liveSceneKey = '';
       // Stufe-1 diagnostic: overlay all flow lines (static) on the preview so
       // path geometry can be eyeballed per scene without live energy data.
       this._showAllPaths = false;
@@ -3612,8 +3647,20 @@
       return deepMerge(SCENE_FLOW_COMPONENT_MAP, this._config.scene_component_map || {});
     }
 
+    // Resolved once, the first time a card has published its scene, so the
+    // selection cannot shift under the user while the dialog is open.
+    _captureLiveScene() {
+      if (this._positionSceneKey || this._liveSceneKey) return;
+      const live = RENDERED_SCENE_BY_CONFIG.get(configSceneFingerprint(this._config));
+      if (live && POSITION_EDITOR_SCENES.some((scene) => scene.key === live)) this._liveSceneKey = live;
+    }
+
     _selectedPositionScene() {
-      const sceneKey = this._positionSceneKey || sceneFileName(this._config.background) || POSITION_EDITOR_SCENES[0]?.key;
+      this._captureLiveScene();
+      const sceneKey = this._positionSceneKey
+        || this._liveSceneKey
+        || sceneFileName(this._config.background)
+        || POSITION_EDITOR_SCENES[0]?.key;
       return POSITION_EDITOR_SCENES.some((scene) => scene.key === sceneKey)
         ? sceneKey
         : (POSITION_EDITOR_SCENES[0]?.key || 'scene_day_clear_idle.png');
@@ -3910,6 +3957,9 @@
           <button type="button" data-copy-positions data-position-target="${this._escapeHtml(selectedScene)}">
             ${this._t('editor.position_copy_button', 'Apply')}
           </button>
+          <button type="button" data-copy-positions-all>
+            ${this._t('editor.position_copy_all_button', 'Apply to all')}
+          </button>
         </div>
         <div class="position-testpaths-row">
           <button type="button" class="position-testpaths-button${this._showAllPaths ? ' is-active' : ''}" data-toggle-all-paths aria-pressed="${this._showAllPaths ? 'true' : 'false'}">
@@ -4043,6 +4093,32 @@
       });
       if (changes.length === 0) return;
       this._applyScenePositionChanges(dstSceneKey, changes, true);
+    }
+
+    // Same copy, fanned out to every scene in one config update. Components the
+    // source leaves automatic (the outage word / X, which have no per-scene
+    // defaults) are cleared on the targets so "make them all like this one"
+    // really does.
+    _copyScenePositionsToAll(srcSceneKey) {
+      const fullMap = this._sceneFlowComponentMap();
+      const srcScene = fullMap[srcSceneKey];
+      if (!srcScene) return;
+      const userSource = this._config.scene_component_map?.[srcSceneKey] || {};
+      const nextMap = { ...(this._config.scene_component_map || {}) };
+      POSITION_EDITOR_SCENES.forEach(({ key }) => {
+        if (key === srcSceneKey) return;
+        const scene = { ...(nextMap[key] || {}) };
+        Object.keys(srcScene).forEach((componentKey) => {
+          scene[componentKey] = { ...srcScene[componentKey] };
+        });
+        AUTOMATIC_POSITION_COMPONENTS.forEach((componentKey) => {
+          if (userSource[componentKey]) scene[componentKey] = { ...userSource[componentKey] };
+          else delete scene[componentKey];
+        });
+        nextMap[key] = scene;
+      });
+      this._applyEditorValue('scene_component_map', nextMap);
+      this._emitConfig();
     }
 
     _updateSceneComponentPosition(sceneKey, componentKey, attr, value, emit = true) {
@@ -5023,6 +5099,16 @@
           const source = sourceSelect?.value;
           if (!source || !target || source === target) return;
           this._copyScenePositions(source, target);
+          this._render();
+        });
+      });
+
+      this.shadowRoot.querySelectorAll('button[data-copy-positions-all]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const sourceSelect = button.parentElement?.querySelector('select[data-position-copy-source]');
+          const source = sourceSelect?.value || this._selectedPositionScene();
+          if (!source) return;
+          this._copyScenePositionsToAll(source);
           this._render();
         });
       });
