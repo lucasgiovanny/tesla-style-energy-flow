@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.39 - 2026-08-27
 
 - Fixed position-editor edits appearing to do nothing on cards with `dynamic_background`: the editor opened on the scene from the static `background` while the card was rendering a weather/time-resolved scene, so every drag was saved to a scene the card never showed. The editor now opens on the scene the card is actually drawing (a manual pick in the scene dropdown still wins)
 - Fixed a dragged outage X being ignored when the drag was the only change in the config
