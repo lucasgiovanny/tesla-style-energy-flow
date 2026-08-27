@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.38 - 2026-08-27
 
 - Added the grid outage X to the visual position editor: it now has its own ring handle in the scene preview and `Outage X` X/Y fields in the Grid group, stored per scene as `grid-marker` in `scene_component_map`. Without a position it keeps riding the grid line's endpoint as before
 - A hand-placed outage word is no longer auto-nudged away from the X — dragging either element now wins over the automatic placement
