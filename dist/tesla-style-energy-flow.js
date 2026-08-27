@@ -139,6 +139,7 @@
         position_field_label: 'Etichetta',
         position_field_value: 'Valore',
         position_field_status: 'Stato rete',
+        position_field_marker: 'X blackout',
         position_field_guide_a: 'Linea A',
         position_field_guide_b: 'Linea B',
         section_scene_positions: 'Posizioni scena',
@@ -235,6 +236,7 @@
         position_field_label: 'Label',
         position_field_value: 'Value',
         position_field_status: 'Grid status',
+        position_field_marker: 'Outage X',
         position_field_guide_a: 'Guide A',
         position_field_guide_b: 'Guide B',
         section_scene_positions: 'Scene positions',
@@ -331,6 +333,7 @@
         position_field_label: 'Etiqueta',
         position_field_value: 'Valor',
         position_field_status: 'Estado de red',
+        position_field_marker: 'X de apagon',
         position_field_guide_a: 'Linea A',
         position_field_guide_b: 'Linea B',
         section_scene_positions: 'Posiciones de escena',
@@ -427,6 +430,7 @@
         position_field_label: 'Etiquette',
         position_field_value: 'Valeur',
         position_field_status: 'Etat reseau',
+        position_field_marker: 'X de coupure',
         position_field_guide_a: 'Repere A',
         position_field_guide_b: 'Repere B',
         section_scene_positions: 'Positions de scene',
@@ -523,6 +527,7 @@
         position_field_label: 'Beschriftung',
         position_field_value: 'Wert',
         position_field_status: 'Netzstatus',
+        position_field_marker: 'Ausfall-X',
         position_field_guide_a: 'Linie A',
         position_field_guide_b: 'Linie B',
         section_scene_positions: 'Szenenpositionen',
@@ -619,6 +624,7 @@
         position_field_label: 'Rótulo',
         position_field_value: 'Valor',
         position_field_status: 'Status da rede',
+        position_field_marker: 'X da queda',
         position_field_guide_a: 'Guia A',
         position_field_guide_b: 'Guia B',
         section_scene_positions: 'Posições da cena',
@@ -715,6 +721,7 @@
         position_field_label: 'Etiqueta',
         position_field_value: 'Valor',
         position_field_status: 'Estado da rede',
+        position_field_marker: 'X da falha',
         position_field_guide_a: 'Guia A',
         position_field_guide_b: 'Guia B',
         section_scene_positions: 'Posições da cena',
@@ -1240,7 +1247,7 @@
 
   const POSITION_EDITOR_GROUPS = Object.freeze([
     Object.freeze({ title: 'Solar', node: 'solar', label: 'solar-label', power: 'solar-power', guide: 'solar-guide' }),
-    Object.freeze({ title: 'Grid', node: 'grid', label: 'grid-label', power: 'grid-power', guide: 'grid-guide', status: 'grid-status' }),
+    Object.freeze({ title: 'Grid', node: 'grid', label: 'grid-label', power: 'grid-power', guide: 'grid-guide', status: 'grid-status', marker: 'grid-marker' }),
     Object.freeze({ title: 'Home', node: 'load', label: 'load-label', power: 'load-power', guide: 'load-guide' }),
     Object.freeze({ title: 'Battery', node: 'battery', label: 'battery-label', power: 'battery-power', guide: 'battery-guide' }),
     Object.freeze({ title: 'EV 1', node: 'ev', label: 'ev-label', power: 'ev-power', guide: 'ev-guide', scene: 'charging' }),
@@ -1902,6 +1909,18 @@
       marker.classList.toggle('active', !!kind);
       marker.classList.toggle('outage-unintentional', unintentional);
       if (!kind) return;
+      // Dragged in the visual position editor; stored per scene relative to the
+      // grid node, like every other component. Without it the X keeps riding the
+      // grid line's endpoint.
+      const placed = this._configuredGridComponent('grid-marker');
+      if (placed) {
+        const origin = POSITION_EDITOR_NODE_ORIGINS.grid;
+        const px = origin.x + safeNum(placed.x, 0);
+        const py = origin.y + safeNum(placed.y, 0);
+        marker.setAttribute('transform', `translate(${px}, ${py})`);
+        this._clearOutageWordFromMarker(status, px, py);
+        return;
+      }
       const path = this._query('#line-grid-load');
       if (!path) return;
       let x = Number.NaN;
@@ -1930,8 +1949,12 @@
     // visual position editor). Without them the word tracks the grid label, so a
     // customised grid column keeps the word in its own column for free.
     _configuredGridStatusPosition() {
+      return this._configuredGridComponent('grid-status');
+    }
+
+    _configuredGridComponent(componentKey) {
       const scene = this._config.scene_component_map?.[this._lastAppliedSceneFlowComponentProfile];
-      return scene?.['grid-status'] || null;
+      return scene?.[componentKey] || null;
     }
 
     // Scene profiles put the grid text where the scene has room, and the X lands
@@ -1963,6 +1986,9 @@
 
     _clearOutageWordFromMarker(status, markerX, markerY) {
       if (!status || !Number.isFinite(markerX) || !Number.isFinite(markerY)) return;
+      // Only auto-place a word that is still tracking the label; a word the user
+      // dragged stays exactly where they put it.
+      if (this._configuredGridStatusPosition()) return;
       const box = this._elementSceneBox(status);
       if (!box) return;
       const marker = {
@@ -3661,6 +3687,7 @@
       return `
         <g class="position-preview-group" data-position-preview-group="${this._escapeHtml(group.node)}">
           ${this._positionPreviewStatus(sceneKey, group)}
+          ${this._positionPreviewMarker(sceneKey, group)}
           <line class="position-preview-guide" data-preview-component="${this._escapeHtml(group.guide)}" x1="${guideStart.x}" y1="${guideStart.y}" x2="${guideEnd.x}" y2="${guideEnd.y}"></line>
           <g
             class="position-preview-text"
@@ -3669,7 +3696,7 @@
             data-position-node="${this._escapeHtml(group.node)}"
             data-position-label-component="${this._escapeHtml(group.label)}"
             data-position-power-component="${this._escapeHtml(group.power)}">
-            <text class="position-preview-label" data-preview-component="${this._escapeHtml(group.label)}" x="${label.x}" y="${label.y}">${title}</text>
+            <text class="position-preview-label${this._positionStatusSharesLabelRow(sceneKey, group) ? ' is-ghosted' : ''}" data-preview-component="${this._escapeHtml(group.label)}" x="${label.x}" y="${label.y}">${title}</text>
             <text class="position-preview-power" data-preview-component="${this._escapeHtml(group.power)}" x="${power.x}" y="${power.y}">0.0 kW</text>
             <circle class="position-text-grip" data-preview-text-grip="${this._escapeHtml(group.label)}" cx="${textCenter.x}" cy="${textCenter.y}" r="8"></circle>
           </g>
@@ -3714,10 +3741,62 @@
       };
     }
 
+    // While the word is unpositioned it sits exactly on the label, which the card
+    // hides during an outage. Ghost the label in the preview so both stay legible.
+    _positionStatusSharesLabelRow(sceneKey, group) {
+      if (!group.status) return false;
+      return !this._config.scene_component_map?.[sceneKey]?.[group.status];
+    }
+
     _positionStatusValue(sceneKey, group, attr) {
       const origin = this._positionNodeOrigin(group);
       const point = this._positionStatusPoint(sceneKey, group);
       return Number((attr === 'x' ? point.x - origin.x : point.y - origin.y).toFixed(2));
+    }
+
+    // The outage X defaults to the start of line-grid-load — the same anchor the
+    // card computes — until it is dragged, which pins it per scene.
+    _positionScenePathStart(sceneKey, pathId) {
+      const configProfile = profileFromConfigPaths(this._config.paths);
+      const sceneProfile = deepMerge(SCENE_FLOW_PATH_MAP, this._config.scene_path_map || {})[sceneKey];
+      const profile = sceneProfile ? { ...configProfile, ...sceneProfile } : configProfile;
+      const d = profile[pathId] || DEFAULT_CONFIG.paths[FLOW_PATH_KEYS[pathId]];
+      const match = /^M\s*(-?\d+(?:\.\d+)?)[\s,]+(-?\d+(?:\.\d+)?)/i.exec(String(d || '').trim());
+      return match ? { x: parseFloat(match[1]), y: parseFloat(match[2]) } : null;
+    }
+
+    _positionMarkerPoint(sceneKey, group) {
+      const origin = this._positionNodeOrigin(group);
+      const override = this._config.scene_component_map?.[sceneKey]?.[group.marker];
+      if (override && override.x !== undefined && override.y !== undefined) {
+        return { x: origin.x + safeNum(override.x, 0), y: origin.y + safeNum(override.y, 0) };
+      }
+      return this._positionScenePathStart(sceneKey, 'line-grid-load') || { x: origin.x, y: origin.y };
+    }
+
+    _positionMarkerValue(sceneKey, group, attr) {
+      const origin = this._positionNodeOrigin(group);
+      const point = this._positionMarkerPoint(sceneKey, group);
+      return Number((attr === 'x' ? point.x - origin.x : point.y - origin.y).toFixed(2));
+    }
+
+    _positionPreviewMarker(sceneKey, group) {
+      if (!group.marker) return '';
+      const point = this._positionMarkerPoint(sceneKey, group);
+      return `
+        <g
+          class="position-preview-marker-group"
+          data-drag-kind="marker"
+          data-position-scene-key="${this._escapeHtml(sceneKey)}"
+          data-position-node="${this._escapeHtml(group.node)}"
+          data-position-marker-component="${this._escapeHtml(group.marker)}"
+          data-preview-marker="${this._escapeHtml(group.marker)}"
+          transform="translate(${point.x}, ${point.y})">
+          <line class="position-preview-marker" x1="-7" y1="-7" x2="7" y2="7"></line>
+          <line class="position-preview-marker" x1="-7" y1="7" x2="7" y2="-7"></line>
+          <circle class="position-marker-grip" cx="0" cy="0" r="9"></circle>
+        </g>
+      `;
     }
 
     _positionPreviewStatus(sceneKey, group) {
@@ -3770,9 +3849,9 @@
 
     _positionAxisInput(sceneKey, componentKey, attr, axis) {
       const group = this._positionGroupForComponent(componentKey);
-      const value = group && group.status === componentKey
-        ? this._positionStatusValue(sceneKey, group, attr)
-        : this._positionValue(sceneKey, componentKey, attr);
+      let value = this._positionValue(sceneKey, componentKey, attr);
+      if (group && group.status === componentKey) value = this._positionStatusValue(sceneKey, group, attr);
+      else if (group && group.marker === componentKey) value = this._positionMarkerValue(sceneKey, group, attr);
       const path = `${sceneKey}:${componentKey}.${attr}`;
       return `
         <label class="position-axis-field">
@@ -3807,6 +3886,7 @@
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_label', 'Label'), group.label, 'x', group.label, 'y')}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_value', 'Value'), group.power, 'x', group.power, 'y')}
             ${group.status ? this._positionPairRow(sceneKey, this._t('editor.position_field_status', 'Grid status'), group.status, 'x', group.status, 'y') : ''}
+            ${group.marker ? this._positionPairRow(sceneKey, this._t('editor.position_field_marker', 'Outage X'), group.marker, 'x', group.marker, 'y') : ''}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_guide_a', 'Guide A'), group.guide, 'x1', group.guide, 'y1')}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_guide_b', 'Guide B'), group.guide, 'x2', group.guide, 'y2')}
           </div>
@@ -3881,7 +3961,8 @@
         group.label === componentKey ||
         group.power === componentKey ||
         group.guide === componentKey ||
-        group.status === componentKey
+        group.status === componentKey ||
+        group.marker === componentKey
       ));
     }
 
@@ -3904,6 +3985,13 @@
       ];
     }
 
+    _positionMarkerDragValues(sceneKey, group) {
+      return [
+        { componentKey: group.marker, attr: 'x', value: this._positionMarkerValue(sceneKey, group, 'x') },
+        { componentKey: group.marker, attr: 'y', value: this._positionMarkerValue(sceneKey, group, 'y') }
+      ];
+    }
+
     _positionGuideDragValues(sceneKey, componentKey, endpoint) {
       return [
         { componentKey, attr: `y${endpoint}`, value: this._positionValue(sceneKey, componentKey, `y${endpoint}`) }
@@ -3913,7 +4001,7 @@
     _positionLinkedChanges(sceneKey, componentKey, attr, value) {
       const group = this._positionGroupForComponent(componentKey);
       // The outage word is free of the label/value column, so its X moves alone.
-      if (group && group.status === componentKey) return [{ componentKey, attr, value }];
+      if (group && (group.status === componentKey || group.marker === componentKey)) return [{ componentKey, attr, value }];
       if (['x', 'x1', 'x2'].includes(attr) && group) {
         return [
           { componentKey: group.label, attr: 'x', value },
@@ -4012,6 +4100,15 @@
         this._setPreviewAttrs(svg, `[data-preview-component="${group.status}"]`, status);
         this._setPreviewAttrs(svg, `[data-preview-status-grip="${group.status}"]`, { cx: status.x, cy: status.y - 5 });
       }
+      if (group.status) {
+        svg?.querySelector(`text[data-preview-component="${group.label}"]`)
+          ?.classList.toggle('is-ghosted', this._positionStatusSharesLabelRow(sceneKey, group));
+      }
+      if (group.marker) {
+        const point = this._positionMarkerPoint(sceneKey, group);
+        const markerEl = svg?.querySelector(`[data-preview-marker="${group.marker}"]`);
+        if (markerEl) markerEl.setAttribute('transform', `translate(${point.x.toFixed(2)}, ${point.y.toFixed(2)})`);
+      }
       this._setPreviewAttrs(svg, `[data-position-component="${group.guide}"][data-position-endpoint="1"]`, { cx: guideStart.x, cy: guideStart.y });
       this._setPreviewAttrs(svg, `[data-position-component="${group.guide}"][data-position-endpoint="2"]`, { cx: guideEnd.x, cy: guideEnd.y });
     }
@@ -4075,6 +4172,9 @@
       } else if (kind === 'status') {
         const group = this._positionGroupForComponent(handle.dataset.positionStatusComponent);
         if (group?.status) drag.values = this._positionStatusDragValues(sceneKey, group);
+      } else if (kind === 'marker') {
+        const group = this._positionGroupForComponent(handle.dataset.positionMarkerComponent);
+        if (group?.marker) drag.values = this._positionMarkerDragValues(sceneKey, group);
       } else if (kind === 'guide') {
         const componentKey = handle.dataset.positionComponent;
         const endpoint = handle.dataset.positionEndpoint === '2' ? '2' : '1';
@@ -4442,6 +4542,9 @@
             font-size: 18px;
             font-weight: 800;
           }
+          .position-preview-label.is-ghosted {
+            opacity: 0.3;
+          }
           .position-preview-status {
             fill: #fb923c;
             text-anchor: middle;
@@ -4454,21 +4557,36 @@
             letter-spacing: 0.06em;
             pointer-events: none;
           }
+          .position-preview-marker {
+            stroke: #fb923c;
+            stroke-width: 3.4;
+            stroke-linecap: round;
+            pointer-events: none;
+            filter: drop-shadow(0 0 3px rgba(251,146,60,0.55));
+          }
           .position-preview-text,
           .position-preview-status-group,
+          .position-preview-marker-group,
           .position-guide-handle {
             cursor: grab;
           }
           .position-preview-svg.is-dragging .position-preview-text,
           .position-preview-svg.is-dragging .position-preview-status-group,
+          .position-preview-svg.is-dragging .position-preview-marker-group,
           .position-preview-svg.is-dragging .position-guide-handle {
             cursor: grabbing;
           }
-          .position-status-grip {
+          .position-status-grip,
+          .position-marker-grip {
             fill: rgba(251,146,60,0.9);
+          }
+          .position-marker-grip {
+            fill: rgba(251,146,60,0.18);
+            stroke: rgba(251,146,60,0.9);
           }
           .position-text-grip,
           .position-status-grip,
+          .position-marker-grip,
           .position-guide-handle {
             fill: rgba(14,165,233,0.86);
             stroke: rgba(248,250,252,0.94);

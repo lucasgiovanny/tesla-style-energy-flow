@@ -119,16 +119,44 @@ assert.match(
 );
 assert.match(
   source,
-  /if \(group && group\.status === componentKey\) return \[\{ componentKey, attr, value \}\];/,
-  "the outage word's X must not drag the label/value column with it"
+  /if \(group && \(group\.status === componentKey \|\| group\.marker === componentKey\)\) return \[\{ componentKey, attr, value \}\];/,
+  "the outage word and the X must not drag the label/value column with them"
+);
+
+// The outage X is draggable too, defaulting to the grid line's endpoint until it
+// is pinned per scene.
+assert.match(
+  source,
+  /title: 'Grid'[^}]*marker: 'grid-marker'/,
+  "the position editor's Grid group should expose the outage X"
+);
+assert.match(
+  source,
+  /kind === 'marker'[\s\S]*_positionMarkerDragValues\(sceneKey, group\)/,
+  'the outage X should have its own drag handler in the position editor'
+);
+assert.match(
+  source,
+  /_positionMarkerPoint\(sceneKey, group\) \{[\s\S]*_positionScenePathStart\(sceneKey, 'line-grid-load'\)/,
+  'an un-dragged X should preview at the grid line endpoint the card uses'
+);
+assert.match(
+  source,
+  /const placed = this\._configuredGridComponent\('grid-marker'\);[\s\S]*marker\.setAttribute\('transform', `translate\(\$\{px\}, \$\{py\}\)`\);/,
+  'a pinned X should win over the line endpoint in the card'
+);
+assert.match(
+  source,
+  /if \(this\._configuredGridStatusPosition\(\)\) return;/,
+  'a hand-placed outage word should never be auto-nudged'
 );
 
 // Without an explicit override the word tracks the grid label, so a customised
 // grid column keeps it in the same column.
 assert.match(
   source,
-  /_configuredGridStatusPosition\(\) \{[\s\S]*this\._config\.scene_component_map\?\.\[this\._lastAppliedSceneFlowComponentProfile\][\s\S]*\['grid-status'\]/,
-  'an explicit scene_component_map entry should win over the label-tracking fallback'
+  /_configuredGridComponent\(componentKey\) \{[\s\S]*this\._config\.scene_component_map\?\.\[this\._lastAppliedSceneFlowComponentProfile\][\s\S]*scene\?\.\[componentKey\]/,
+  'an explicit scene_component_map entry should win over the automatic placement'
 );
 
 // The word never sits on top of the outage X.
