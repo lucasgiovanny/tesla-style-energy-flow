@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.36 - 2026-08-27
 
 - Fixed the grid outage word (`OFF-GRID` / `GRID OUTAGE` / `DISCONNECTED`) hanging as a third line under the grid kW value, where scene profiles that place the grid text low left it glued to — or clipped by — the bottom card edge. It now takes over the grid label's row, right under the outage X and above the kW value, in the label's type size
 
