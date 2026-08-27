@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added the grid outage word to the visual position editor: it now has its own orange drag handle in the scene preview and `Grid status` X/Y fields in the Grid group, stored per scene as `grid-status` in `scene_component_map`
+- Fixed the outage word colliding with the outage X on some layouts — it is now pushed sideways clear of the X, and without an explicit position it tracks the grid label, so a hand-tuned grid column keeps the word in its own column
+
 ## 0.3.36 - 2026-08-27
 
 - Fixed the grid outage word (`OFF-GRID` / `GRID OUTAGE` / `DISCONNECTED`) hanging as a third line under the grid kW value, where scene profiles that place the grid text low left it glued to — or clipped by — the bottom card edge. It now takes over the grid label's row, right under the outage X and above the kW value, in the label's type size

@@ -42,6 +42,12 @@
     margin: 18,
     labelPowerGap: 22
   });
+  // Half-size of the outage X (5.5 arms + stroke) and the breathing room kept
+  // between it and the outage word.
+  const OUTAGE_MARKER_CLEARANCE = Object.freeze({
+    half: 7.2,
+    gap: 4
+  });
   const I18N = Object.freeze({
     it: {
       card: {
@@ -132,6 +138,7 @@
         position_paths_hint: 'Overlay statico di ogni linea di flusso per questa scena — verifica che ogni linea raggiunga i suoi nodi.',
         position_field_label: 'Etichetta',
         position_field_value: 'Valore',
+        position_field_status: 'Stato rete',
         position_field_guide_a: 'Linea A',
         position_field_guide_b: 'Linea B',
         section_scene_positions: 'Posizioni scena',
@@ -227,6 +234,7 @@
         position_paths_hint: 'Static overlay of every flow line for this scene — check each line reaches its nodes.',
         position_field_label: 'Label',
         position_field_value: 'Value',
+        position_field_status: 'Grid status',
         position_field_guide_a: 'Guide A',
         position_field_guide_b: 'Guide B',
         section_scene_positions: 'Scene positions',
@@ -322,6 +330,7 @@
         position_paths_hint: 'Superposición estática de cada línea de flujo de esta escena — comprueba que cada línea llega a sus nodos.',
         position_field_label: 'Etiqueta',
         position_field_value: 'Valor',
+        position_field_status: 'Estado de red',
         position_field_guide_a: 'Linea A',
         position_field_guide_b: 'Linea B',
         section_scene_positions: 'Posiciones de escena',
@@ -417,6 +426,7 @@
         position_paths_hint: 'Superposition statique de chaque ligne de flux pour cette scène — vérifiez que chaque ligne atteint ses nœuds.',
         position_field_label: 'Etiquette',
         position_field_value: 'Valeur',
+        position_field_status: 'Etat reseau',
         position_field_guide_a: 'Repere A',
         position_field_guide_b: 'Repere B',
         section_scene_positions: 'Positions de scene',
@@ -512,6 +522,7 @@
         position_paths_hint: 'Statisches Overlay aller Flow-Linien dieser Szene — prüfe, ob jede Linie ihre Knoten erreicht.',
         position_field_label: 'Beschriftung',
         position_field_value: 'Wert',
+        position_field_status: 'Netzstatus',
         position_field_guide_a: 'Linie A',
         position_field_guide_b: 'Linie B',
         section_scene_positions: 'Szenenpositionen',
@@ -607,6 +618,7 @@
         position_paths_hint: 'Sobreposição estática de todas as linhas de fluxo desta cena — verifique se cada linha alcança seus nós.',
         position_field_label: 'Rótulo',
         position_field_value: 'Valor',
+        position_field_status: 'Status da rede',
         position_field_guide_a: 'Guia A',
         position_field_guide_b: 'Guia B',
         section_scene_positions: 'Posições da cena',
@@ -702,6 +714,7 @@
         position_paths_hint: 'Sobreposição estática de todas as linhas de fluxo desta cena — verifique se cada linha chega aos seus nós.',
         position_field_label: 'Etiqueta',
         position_field_value: 'Valor',
+        position_field_status: 'Estado da rede',
         position_field_guide_a: 'Guia A',
         position_field_guide_b: 'Guia B',
         section_scene_positions: 'Posições da cena',
@@ -1227,7 +1240,7 @@
 
   const POSITION_EDITOR_GROUPS = Object.freeze([
     Object.freeze({ title: 'Solar', node: 'solar', label: 'solar-label', power: 'solar-power', guide: 'solar-guide' }),
-    Object.freeze({ title: 'Grid', node: 'grid', label: 'grid-label', power: 'grid-power', guide: 'grid-guide' }),
+    Object.freeze({ title: 'Grid', node: 'grid', label: 'grid-label', power: 'grid-power', guide: 'grid-guide', status: 'grid-status' }),
     Object.freeze({ title: 'Home', node: 'load', label: 'load-label', power: 'load-power', guide: 'load-guide' }),
     Object.freeze({ title: 'Battery', node: 'battery', label: 'battery-label', power: 'battery-power', guide: 'battery-guide' }),
     Object.freeze({ title: 'EV 1', node: 'ev', label: 'ev-label', power: 'ev-power', guide: 'ev-guide', scene: 'charging' }),
@@ -1258,6 +1271,7 @@
     'solar-guide': Object.freeze({ id: 'flow-solar-guide', attrs: Object.freeze(['x1', 'y1', 'x2', 'y2']) }),
     'grid-label': Object.freeze({ id: 'flow-grid-label', attrs: Object.freeze(['x', 'y']) }),
     'grid-power': Object.freeze({ id: 'flow-grid-power', attrs: Object.freeze(['x', 'y']) }),
+    'grid-status': Object.freeze({ id: 'flow-grid-status', attrs: Object.freeze(['x', 'y']) }),
     'grid-guide': Object.freeze({ id: 'flow-grid-guide', attrs: Object.freeze(['x1', 'y1', 'x2', 'y2']) }),
     'load-label': Object.freeze({ id: 'flow-load-label', attrs: Object.freeze(['x', 'y']) }),
     'load-power': Object.freeze({ id: 'flow-load-power', attrs: Object.freeze(['x', 'y']) }),
@@ -1869,14 +1883,16 @@
             ? 'GRID OUTAGE'
             : (kind === 'intentional' ? 'OFF-GRID' : 'DISCONNECTED');
           this._setText('#flow-grid-status', this._t(statusKey, statusFallback));
-          // The outage word takes over the grid label's row instead of hanging a
-          // third line under the kW value: the label row is the slot the scene
-          // profiles already keep clear of the outage X and inside the fitted
-          // viewBox, so the word no longer sits glued to the bottom card edge.
-          const power = this._query('#flow-grid-power');
-          const powerY = safeNum(power?.getAttribute('y'), 85);
-          status.setAttribute('x', label?.getAttribute('x') || power?.getAttribute('x') || '6');
-          status.setAttribute('y', String(safeNum(label?.getAttribute('y'), powerY - 18)));
+          // The word has its own per-scene coordinates ('grid-status'), applied by
+          // _applyComponentProfile and draggable in the visual position editor.
+          // Profiles that predate it fall back to the grid label's slot, which is
+          // scene-tuned and inside the fitted viewBox — never the card edge.
+          if (!this._configuredGridStatusPosition()) {
+            const power = this._query('#flow-grid-power');
+            const powerY = safeNum(power?.getAttribute('y'), 85);
+            status.setAttribute('x', label?.getAttribute('x') || power?.getAttribute('x') || '6');
+            status.setAttribute('y', String(safeNum(label?.getAttribute('y'), powerY - 18)));
+          }
         }
       }
       // Hide the plain "Grid" caption while the outage word occupies its row.
@@ -1907,6 +1923,65 @@
         y = parseFloat(m[2]);
       }
       marker.setAttribute('transform', `translate(${x}, ${y})`);
+      this._clearOutageWordFromMarker(status, x, y);
+    }
+
+    // Explicit grid-status coordinates from scene_component_map (dragged in the
+    // visual position editor). Without them the word tracks the grid label, so a
+    // customised grid column keeps the word in its own column for free.
+    _configuredGridStatusPosition() {
+      const scene = this._config.scene_component_map?.[this._lastAppliedSceneFlowComponentProfile];
+      return scene?.['grid-status'] || null;
+    }
+
+    // Scene profiles put the grid text where the scene has room, and the X lands
+    // wherever the grid line ends — on a few layouts (and on hand-tuned
+    // scene_component_map overrides) the two end up on the same row. Slide the
+    // word sideways, away from the X, just enough to clear it: vertical space is
+    // boxed in by the guide above and the kW value below, horizontal is not.
+    _elementSceneBox(el) {
+      let box;
+      try {
+        box = el.getBBox();
+      } catch (_error) {
+        return null;
+      }
+      if (!box || !box.width) return null;
+      let x = box.x;
+      let y = box.y;
+      let node = el.parentElement;
+      while (node && node.tagName?.toLowerCase() !== 'svg') {
+        const match = (node.getAttribute?.('transform') || '').match(/translate\(\s*(-?[\d.]+)(?:[,\s]+(-?[\d.]+))?/);
+        if (match) {
+          x += safeNum(match[1], 0);
+          y += safeNum(match[2], 0);
+        }
+        node = node.parentElement;
+      }
+      return { x1: x, y1: y, x2: x + box.width, y2: y + box.height };
+    }
+
+    _clearOutageWordFromMarker(status, markerX, markerY) {
+      if (!status || !Number.isFinite(markerX) || !Number.isFinite(markerY)) return;
+      const box = this._elementSceneBox(status);
+      if (!box) return;
+      const marker = {
+        x1: markerX - OUTAGE_MARKER_CLEARANCE.half,
+        y1: markerY - OUTAGE_MARKER_CLEARANCE.half,
+        x2: markerX + OUTAGE_MARKER_CLEARANCE.half,
+        y2: markerY + OUTAGE_MARKER_CLEARANCE.half
+      };
+      const overlaps = box.x1 < marker.x2 && marker.x1 < box.x2 && box.y1 < marker.y2 && marker.y1 < box.y2;
+      if (!overlaps) return;
+      const pad = OUTAGE_MARKER_CLEARANCE.gap;
+      const viewBox = this._sceneViewBox();
+      const pushRight = (box.x1 + box.x2) / 2 >= markerX;
+      let dx = pushRight ? marker.x2 + pad - box.x1 : marker.x1 - pad - box.x2;
+      // Flip the push when it would carry the word out of the scene.
+      if (pushRight && box.x2 + dx > viewBox.maxX) dx = marker.x1 - pad - box.x2;
+      else if (!pushRight && box.x1 + dx < viewBox.minX) dx = marker.x2 + pad - box.x1;
+      if (box.x1 + dx < viewBox.minX || box.x2 + dx > viewBox.maxX) return;
+      this._setSvgAttrs(status, { x: Number((safeNum(status.getAttribute('x'), 0) + dx).toFixed(2)) });
     }
 
     _dominantFlowClass(id, solarW, batteryW, gridW, fallback) {
@@ -2354,6 +2429,8 @@
     _sceneViewBox() {
       const sceneScale = clamp(safeNum(this._config.scene_scale, 1), 0.6, 1.4);
       return {
+        minX: 300 - (300 / sceneScale),
+        maxX: 300 + (300 / sceneScale),
         minY: 230 - (230 / sceneScale),
         maxY: 230 + (230 / sceneScale)
       };
@@ -3583,6 +3660,7 @@
       const scene = this._escapeHtml(sceneKey);
       return `
         <g class="position-preview-group" data-position-preview-group="${this._escapeHtml(group.node)}">
+          ${this._positionPreviewStatus(sceneKey, group)}
           <line class="position-preview-guide" data-preview-component="${this._escapeHtml(group.guide)}" x1="${guideStart.x}" y1="${guideStart.y}" x2="${guideEnd.x}" y2="${guideEnd.y}"></line>
           <g
             class="position-preview-text"
@@ -3619,6 +3697,46 @@
       `;
     }
 
+    // The grid outage word is positioned on its own (it replaces the grid
+    // caption while the site is off-grid), so it gets a separate drag handle
+    // instead of riding along with the label/value block.
+    // Mirrors the card: an explicit override wins, otherwise the word sits in
+    // the grid label's slot (which is column-locked to the guide).
+    _positionStatusPoint(sceneKey, group) {
+      const override = this._config.scene_component_map?.[sceneKey]?.[group.status];
+      const label = this._positionScenePoint(sceneKey, group, group.label);
+      const origin = this._positionNodeOrigin(group);
+      return {
+        x: override && override.x !== undefined
+          ? origin.x + safeNum(override.x, 0)
+          : origin.x + this._positionValue(sceneKey, group.guide, 'x1'),
+        y: override && override.y !== undefined ? origin.y + safeNum(override.y, 0) : label.y
+      };
+    }
+
+    _positionStatusValue(sceneKey, group, attr) {
+      const origin = this._positionNodeOrigin(group);
+      const point = this._positionStatusPoint(sceneKey, group);
+      return Number((attr === 'x' ? point.x - origin.x : point.y - origin.y).toFixed(2));
+    }
+
+    _positionPreviewStatus(sceneKey, group) {
+      if (!group.status) return '';
+      const point = this._positionStatusPoint(sceneKey, group);
+      const text = this._escapeHtml(this._t('card.status.off_grid', 'OFF-GRID'));
+      return `
+        <g
+          class="position-preview-status-group"
+          data-drag-kind="status"
+          data-position-scene-key="${this._escapeHtml(sceneKey)}"
+          data-position-node="${this._escapeHtml(group.node)}"
+          data-position-status-component="${this._escapeHtml(group.status)}">
+          <text class="position-preview-status" data-preview-component="${this._escapeHtml(group.status)}" x="${point.x}" y="${point.y}">${text}</text>
+          <circle class="position-status-grip" data-preview-status-grip="${this._escapeHtml(group.status)}" cx="${point.x}" cy="${point.y - 5}" r="8"></circle>
+        </g>
+      `;
+    }
+
     _positionPreviewSvg(sceneKey) {
       const background = this._escapeHtml(this._positionPreviewBackground(sceneKey));
       return `
@@ -3651,7 +3769,10 @@
     }
 
     _positionAxisInput(sceneKey, componentKey, attr, axis) {
-      const value = this._positionValue(sceneKey, componentKey, attr);
+      const group = this._positionGroupForComponent(componentKey);
+      const value = group && group.status === componentKey
+        ? this._positionStatusValue(sceneKey, group, attr)
+        : this._positionValue(sceneKey, componentKey, attr);
       const path = `${sceneKey}:${componentKey}.${attr}`;
       return `
         <label class="position-axis-field">
@@ -3685,6 +3806,7 @@
           <div class="position-pair-grid">
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_label', 'Label'), group.label, 'x', group.label, 'y')}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_value', 'Value'), group.power, 'x', group.power, 'y')}
+            ${group.status ? this._positionPairRow(sceneKey, this._t('editor.position_field_status', 'Grid status'), group.status, 'x', group.status, 'y') : ''}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_guide_a', 'Guide A'), group.guide, 'x1', group.guide, 'y1')}
             ${this._positionPairRow(sceneKey, this._t('editor.position_field_guide_b', 'Guide B'), group.guide, 'x2', group.guide, 'y2')}
           </div>
@@ -3758,7 +3880,8 @@
       return POSITION_EDITOR_GROUPS.find((group) => (
         group.label === componentKey ||
         group.power === componentKey ||
-        group.guide === componentKey
+        group.guide === componentKey ||
+        group.status === componentKey
       ));
     }
 
@@ -3774,6 +3897,13 @@
       ];
     }
 
+    _positionStatusDragValues(sceneKey, group) {
+      return [
+        { componentKey: group.status, attr: 'x', value: this._positionStatusValue(sceneKey, group, 'x') },
+        { componentKey: group.status, attr: 'y', value: this._positionStatusValue(sceneKey, group, 'y') }
+      ];
+    }
+
     _positionGuideDragValues(sceneKey, componentKey, endpoint) {
       return [
         { componentKey, attr: `y${endpoint}`, value: this._positionValue(sceneKey, componentKey, `y${endpoint}`) }
@@ -3782,6 +3912,8 @@
 
     _positionLinkedChanges(sceneKey, componentKey, attr, value) {
       const group = this._positionGroupForComponent(componentKey);
+      // The outage word is free of the label/value column, so its X moves alone.
+      if (group && group.status === componentKey) return [{ componentKey, attr, value }];
       if (['x', 'x1', 'x2'].includes(attr) && group) {
         return [
           { componentKey: group.label, attr: 'x', value },
@@ -3875,6 +4007,11 @@
         y2: guideEnd.y
       });
       this._setPreviewAttrs(svg, `[data-preview-text-grip="${group.label}"]`, { cx: textCenter.x, cy: textCenter.y });
+      if (group.status) {
+        const status = this._positionStatusPoint(sceneKey, group);
+        this._setPreviewAttrs(svg, `[data-preview-component="${group.status}"]`, status);
+        this._setPreviewAttrs(svg, `[data-preview-status-grip="${group.status}"]`, { cx: status.x, cy: status.y - 5 });
+      }
       this._setPreviewAttrs(svg, `[data-position-component="${group.guide}"][data-position-endpoint="1"]`, { cx: guideStart.x, cy: guideStart.y });
       this._setPreviewAttrs(svg, `[data-position-component="${group.guide}"][data-position-endpoint="2"]`, { cx: guideEnd.x, cy: guideEnd.y });
     }
@@ -3935,6 +4072,9 @@
       if (kind === 'text') {
         const group = this._positionGroupForComponent(handle.dataset.positionLabelComponent);
         if (group) drag.values = this._positionTextDragValues(sceneKey, group);
+      } else if (kind === 'status') {
+        const group = this._positionGroupForComponent(handle.dataset.positionStatusComponent);
+        if (group?.status) drag.values = this._positionStatusDragValues(sceneKey, group);
       } else if (kind === 'guide') {
         const componentKey = handle.dataset.positionComponent;
         const endpoint = handle.dataset.positionEndpoint === '2' ? '2' : '1';
@@ -4302,15 +4442,33 @@
             font-size: 18px;
             font-weight: 800;
           }
+          .position-preview-status {
+            fill: #fb923c;
+            text-anchor: middle;
+            paint-order: stroke;
+            stroke: rgba(2,6,23,0.8);
+            stroke-width: 3px;
+            stroke-linejoin: round;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            pointer-events: none;
+          }
           .position-preview-text,
+          .position-preview-status-group,
           .position-guide-handle {
             cursor: grab;
           }
           .position-preview-svg.is-dragging .position-preview-text,
+          .position-preview-svg.is-dragging .position-preview-status-group,
           .position-preview-svg.is-dragging .position-guide-handle {
             cursor: grabbing;
           }
+          .position-status-grip {
+            fill: rgba(251,146,60,0.9);
+          }
           .position-text-grip,
+          .position-status-grip,
           .position-guide-handle {
             fill: rgba(14,165,233,0.86);
             stroke: rgba(248,250,252,0.94);

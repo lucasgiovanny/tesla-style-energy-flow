@@ -187,8 +187,11 @@ The indicator distinguishes *why* the site is off-grid:
 | `off`, `disconnected`, `islanded` — off-grid, intent unknown | orange | `DISCONNECTED` |
 
 The status word takes over the grid label's row — right under the X and above the
-kW value, so it always stays inside the scene instead of hanging off the bottom
-edge — and follows `show_labels`.
+kW value — and follows `show_labels`. It tracks the grid label, so it stays in the
+column even on hand-tuned layouts, and is nudged sideways if it would land on the
+X. To place it yourself, drag the orange handle in **Edit visually** (the scene
+position editor) or set `grid-status` X/Y in the Grid group; the value is stored
+per scene in `scene_component_map`.
 
 ## Troubleshooting
 

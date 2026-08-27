@@ -99,6 +99,45 @@ assert.match(
   'the outage word should use the grid label type size'
 );
 
+// The outage word is a first-class, draggable component in the visual position
+// editor: bound to scene_component_map, listed in the Grid group, with its own
+// drag kind so it moves independently of the label/value column.
+assert.match(
+  source,
+  /'grid-status': Object\.freeze\(\{ id: 'flow-grid-status', attrs: Object\.freeze\(\['x', 'y'\]\) \}\),/,
+  'grid-status should be a positionable flow component'
+);
+assert.match(
+  source,
+  /title: 'Grid'[^}]*status: 'grid-status'/,
+  "the position editor's Grid group should expose the outage word"
+);
+assert.match(
+  source,
+  /kind === 'status'[\s\S]*_positionStatusDragValues\(sceneKey, group\)/,
+  'the outage word should have its own drag handler in the position editor'
+);
+assert.match(
+  source,
+  /if \(group && group\.status === componentKey\) return \[\{ componentKey, attr, value \}\];/,
+  "the outage word's X must not drag the label/value column with it"
+);
+
+// Without an explicit override the word tracks the grid label, so a customised
+// grid column keeps it in the same column.
+assert.match(
+  source,
+  /_configuredGridStatusPosition\(\) \{[\s\S]*this\._config\.scene_component_map\?\.\[this\._lastAppliedSceneFlowComponentProfile\][\s\S]*\['grid-status'\]/,
+  'an explicit scene_component_map entry should win over the label-tracking fallback'
+);
+
+// The word never sits on top of the outage X.
+assert.match(
+  source,
+  /_clearOutageWordFromMarker\(status, x, y\);/,
+  'the outage word should be pushed clear of the X after the marker is placed'
+);
+
 // The status word appears with a per-kind label.
 assert.match(
   source,
