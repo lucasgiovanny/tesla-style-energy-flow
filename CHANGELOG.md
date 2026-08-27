@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.37 - 2026-08-27
 
 - Added the grid outage word to the visual position editor: it now has its own orange drag handle in the scene preview and `Grid status` X/Y fields in the Grid group, stored per scene as `grid-status` in `scene_component_map`
 - Fixed the outage word colliding with the outage X on some layouts — it is now pushed sideways clear of the X, and without an explicit position it tracks the grid label, so a hand-tuned grid column keeps the word in its own column
