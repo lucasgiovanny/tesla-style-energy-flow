@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed the junction → battery flow line reading as a grid charge whenever the grid contributed anything at all: `line-grid-battery` covers the same leg as `line-solar-battery` and paints over it, so a 0.8 kW grid top-up hid a 4.1 kW solar charge under red. The shared leg is now coloured by the dominant charger, the way the junction → home line already was, and the solar trunk above the junction stays yellow either way
+
 ## 0.3.39 - 2026-08-27
 
 - Fixed position-editor edits appearing to do nothing on cards with `dynamic_background`: the editor opened on the scene from the static `background` while the card was rendering a weather/time-resolved scene, so every drag was saved to a scene the card never showed. The editor now opens on the scene the card is actually drawing (a manual pick in the scene dropdown still wins)

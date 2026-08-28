@@ -3372,7 +3372,14 @@
 
       this._activatePath('line-solar-battery', 'flow-solar', solarToBattery, batteryMin);
       if (!gridOutage) {
-        this._activatePath('line-grid-battery', 'flow-broken', gridToBattery, batteryMin);
+        // line-grid-battery covers only the junction→battery leg, which line-solar-battery
+        // also draws — and it paints last, so a small grid trickle used to hide a much
+        // larger solar charge under red (0.8 kW grid over 4.1 kW solar read as "the grid is
+        // charging the battery"). Colour the shared leg by the dominant charger, the same
+        // way line-junction-home-load already does. The solar trunk above the junction
+        // stays yellow: only the leg the two paths share changes colour.
+        const battCls = this._dominantFlowClass('battery', solarToBattery, 0, gridToBattery, 'flow-solar');
+        this._activatePath('line-grid-battery', battCls, gridToBattery, batteryMin);
         // line-solar-grid: only solar export; battery→grid is shown via line-battery-load + line-grid-load (reverse)
         this._activatePath('line-solar-grid', 'flow-green', solarExport, Math.max(1, gridMin));
       }

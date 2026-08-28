@@ -234,7 +234,7 @@ assert.match(
 );
 assert.match(
   source,
-  /if \(!gridOutage\) \{\s*this\._activatePath\('line-grid-battery', 'flow-broken', gridToBattery, batteryMin\);/,
+  /if \(!gridOutage\) \{[\s\S]*this\._activatePath\('line-grid-battery', battCls, gridToBattery, batteryMin\);/,
   'grid-to-battery and solar-to-grid flow lines should stay dark during an outage'
 );
 assert.match(

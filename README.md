@@ -237,6 +237,27 @@ If a flow points the wrong way, add `grid_invert: true` and/or `battery_invert: 
 or use the separate `grid_import_power` / `grid_export_power` and
 `battery_charge_power` / `battery_discharge_power` entities.
 
+### A source is feeding the "wrong" node
+
+**Symptom:** the grid is (say) covering the house and the solar is charging the
+battery, but the card draws the solar line into the house and a red grid line into
+the battery.
+
+**Cause:** with the four aggregate sensors the card reads (`solar_power`,
+`grid_power`, `battery_power`, `load_power`) there is no way to measure *which*
+source feeds *which* sink — on an AC bus the electrons are not labelled. The card
+derives it with the same convention the Tesla app and the Home Assistant Energy
+Dashboard use: **solar covers the home load first**, the surplus charges the
+battery, and the grid tops up whatever is left. So solar 4.9 kW / home 0.8 kW /
+grid 0.8 kW / battery +4.9 kW is drawn as solar → home 0.8, solar → battery 4.1,
+grid → battery 0.8. That balances, and it is not distinguishable from "grid feeds
+the house while solar charges the battery" by any sensor the card has.
+
+There is nothing to configure here — separate `grid_import_power` /
+`grid_export_power` and `battery_charge_power` / `battery_discharge_power`
+entities only split the same aggregates, they do not carry source → sink routing.
+
+
 ## Screenshots
 
 Day clear (idle)
