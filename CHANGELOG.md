@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.40 - 2026-08-28
 
 - Fixed the junction → battery flow line reading as a grid charge whenever the grid contributed anything at all: `line-grid-battery` covers the same leg as `line-solar-battery` and paints over it, so a 0.8 kW grid top-up hid a 4.1 kW solar charge under red. The shared leg is now coloured by the dominant charger, the way the junction → home line already was, and the solar trunk above the junction stays yellow either way
 
