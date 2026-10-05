@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.41 - 2026-10-05
 
 - Merged upstream v0.3.31 (stexecute/tesla-style-energy-flow) into the fork, keeping every fork feature (grid outage indicator, theme card radius, per-scene editor fixes, dominant-charger battery leg):
   - Added optional heat-pump scenes: with `heat_pump_power` configured the card uses dedicated artwork and shows a heat pump node; `heat_pump_in_load` avoids counting that consumption twice. Dashboards without the sensor keep the original backgrounds. For manual installs, copy the complete `dist/backgrounds/` directory alongside the card script
