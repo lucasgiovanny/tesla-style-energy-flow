@@ -34,7 +34,7 @@ const allocatorBody = sliceBetween(
 );
 
 const allocate = new Function('inputs', `
-  const { solarPower, loadPower, gridPower, batteryPower, evSceneActive, evPower, ev1, ev2 } = inputs;
+  const { solarPower, loadPower, gridPower, batteryPower, evSceneActive, evPower, ev1, ev2, heatPumpPower = 0 } = inputs;
   ${allocatorBody}
   return { solarToLoad, solarToBattery, gridToLoad, gridToBattery, battToLoad };
 `);

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Merged upstream v0.3.31 (stexecute/tesla-style-energy-flow) into the fork, keeping every fork feature (grid outage indicator, theme card radius, per-scene editor fixes, dominant-charger battery leg):
+  - Added optional heat-pump scenes: with `heat_pump_power` configured the card uses dedicated artwork and shows a heat pump node; `heat_pump_in_load` avoids counting that consumption twice. Dashboards without the sensor keep the original backgrounds. For manual installs, copy the complete `dist/backgrounds/` directory alongside the card script
+  - Replaced the moving dashes with a bright leading edge and fading tail on a shared two-second cycle; reverse flows mirror the tail, and reduced-motion and offscreen behavior are kept
+  - Added background dimming and EV-2-only image overrides
+  - The visual position editor shows the heat pump artwork and keeps the heat pump's sideways guide intact when you drag or edit it
+  - Home, battery, grid, EV 1 and EV 2 guides now drop vertically onto their object in every scene: home onto the window block (or the distribution box with a heat pump), battery into the battery, grid onto the ground cable, EVs onto each car's plug
+  - Restored the grid guide line, and moved solar and home text closer to the house
+  - EV 1 and EV 2 text is stacked so the two never share a row or cover the lit gable window
+  - The heat pump label sits beside the unit, or above it in the dual-charging scenes, and stays clear of the roof eave, the card edge and the artwork for long translations
+  - Fixed the solar-to-grid export line rendering in the battery color
+  - Fixed the afternoon scene rendering darker than the evening and night scenes
+  - Fixed editor entity selection, stale flow elements and mW/MW power conversion
+
 ## 0.3.40 - 2026-08-28
 
 - Fixed the junction → battery flow line reading as a grid charge whenever the grid contributed anything at all: `line-grid-battery` covers the same leg as `line-solar-battery` and paints over it, so a 0.8 kW grid top-up hid a 4.1 kW solar charge under red. The shared leg is now coloured by the dominant charger, the way the junction → home line already was, and the solar trunk above the junction stays yellow either way

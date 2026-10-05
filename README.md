@@ -27,13 +27,14 @@ Custom Home Assistant Lovelace card for energy flows on a house scene, with dyna
 
 ![Tesla Style Energy Flow single EV day](docs/screenshots/08-single-ev-day-clear.png)
 
-[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Screenshots](#screenshots) • [Files](#files) • [License](#license)
+[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Heat pump](#heat-pump) • [Troubleshooting](#troubleshooting) • [Screenshots](#screenshots) • [Files](#files) • [License](#license)
 
 ## Features
 
 - Smooth animated SVG flow lines
 - Flow colors by source: solar = yellow, battery = green, grid = red
 - Dynamic background (weather + day/night + EV charging)
+- Adjustable background dimming for custom images (`background_dim`, from `0` to `1`)
 - Scene-specific label/guide positioning for each background
 - Optional dual-EV support with separate EV1 / EV2 power, battery and charging switch entities
 - Optional `ev_label` / `ev2_label` for custom vehicle names
@@ -49,9 +50,12 @@ Custom Home Assistant Lovelace card for energy flows on a house scene, with dyna
   - `thresholds.solar_min_w`
   - `thresholds.grid_min_w`
   - `thresholds.battery_min_w`
+  - `thresholds.heat_pump_min_w`
   - `ev_min_w`
 - Optional `ev_hide_when_idle` to hide EV labels/guide when not charging
 - Optional `ev_in_load` / `ev2_in_load` for whole-home meters that already include the wallbox draw in `load_power` (SMA SHM 2.0, SolarEdge total_consumption, …) — the card subtracts EV power from load before flow allocation so the battery is not double-counted
+- Optional `heat_pump_power` entity adds a dedicated **Heat Pump** node — outdoor unit artwork, an amber feed line from the distribution box, and day/rain/night sprite variants. Hidden automatically when not configured. See [Heat pump](#heat-pump)
+- Optional `heat_pump_in_load` for whole-home meters that already include the heat pump's draw in `load_power` — same double-counting fix as `ev_in_load`, applied to the heat pump
 - Optional `smoothing_seconds` (Tesla-style EWMA, default `0`) — set to e.g. `10` to dampen the cloud-induced jumpiness on Solar, Grid, Battery, Load. EV power stays unsmoothed so start/stop transitions remain instant.
 - Optional `show_header` to show or hide the card title
 - Optional `font_scale` to improve readability on compact cards or tablet layouts
@@ -96,19 +100,24 @@ language: auto
 background: /local/community/tesla-style-energy-flow/backgrounds/scene_day_clear_idle.png
 dynamic_background: true
 background_asset_base: /local/community/tesla-style-energy-flow/backgrounds
+background_dim: 1.0 # set 0 to disable the dark overlays
 battery_invert: false
 grid_invert: false
 font_scale: 1.0
 ev_label: Model Y
 ev2_label: Model 3
+heat_pump_label: Heat Pump
 roof_a_label: South
 roof_b_label: West
 ev_hide_when_idle: false
 ev_min_w: 150
+# Set true only if load_power already includes the heat pump's draw
+heat_pump_in_load: false
 thresholds:
   solar_min_w: 50
   grid_min_w: 50
   battery_min_w: 50
+  heat_pump_min_w: 50
 entities:
   solar_power: sensor.solar_power
   roof_a_power: sensor.roof_array_a_power
@@ -123,6 +132,8 @@ entities:
   battery_power: sensor.battery_power
   load_power: sensor.home_load_power
   battery_level: sensor.battery_level
+  # Optional heat pump — omit entirely to hide the Heat Pump node
+  heat_pump_power: sensor.heat_pump_power
   ev_power: sensor.ev_charging_power
   ev_battery: sensor.ev_battery_level
   ev_charge_switch: switch.ev_charge
@@ -145,6 +156,15 @@ If presence entities are configured:
 - the card can keep the EV scene visible when a car is at home even if charging power is `0`
 - if only one EV is present/active, the single-car scene is reused and mapped to that vehicle
 - if both EVs are present/active, the dual-EV scene logic is used
+
+If you use different car artwork, set `background_map.day_clear_ev2_only` and
+`background_map.night_clear_ev2_only` to your own images. These are used only
+when EV 2 is the sole present or charging vehicle. Weather-specific keys such
+as `day_rain_ev2_only` can be added in YAML; otherwise the clear variant is
+used. Without these overrides, existing scene selection is unchanged.
+
+`background_dim` scales the card's dark overlays. The default `1` preserves
+the normal scene tone; `0` removes the overlays for already-dark custom images.
 
 Optional roof array sensors can also be added for two array overlays:
 
@@ -202,7 +222,92 @@ see — switch scenes in the dropdown to lay out the others, or use
 scene at once — drag either one and it stays exactly where you put it (a hand-placed word
 is never auto-nudged); clear the entry to go back to automatic placement.
 
+## Heat pump
+
+Adding a `heat_pump_power` sensor turns on a dedicated **Heat Pump** node: an
+outdoor unit rendered against the house wall, its own amber feed line from the
+distribution box, and a live kW readout.
+
+```yaml
+entities:
+  heat_pump_power: sensor.heat_pump_power   # the only required entity
+heat_pump_label: Heat Pump                  # optional custom name
+heat_pump_in_load: false                    # see below
+thresholds:
+  heat_pump_min_w: 50                       # hide the flow below this
+```
+
+The whole node — unit, label and feed line — is hidden automatically when
+`heat_pump_power` is not configured, so existing dashboards are unaffected.
+The card also selects the matching `*_heat_pump.png` background and its scene
+positions when the sensor is configured, including when its current reading is
+zero or unavailable. Without the sensor, it uses the original 12 backgrounds
+and positions. Custom `background` and `background_map` images are left as set.
+
+### How the power is allocated
+
+The heat pump shares a power pool with EV charging. Solar covers the base home
+load first. Remaining solar, then available battery discharge and grid import,
+are split between EV and heat pump in proportion to their demand. Any battery
+or grid power left after that covers unmet home load. For example, if 3 kW of
+solar remains while the EV draws 6 kW and the heat pump draws 2 kW, solar
+supplies 2.25 kW to the EV and 0.75 kW to the heat pump.
+
+Its line is always amber, unlike the EV line which is coloured by whichever
+source dominates. Heat pump power is also EWMA-smoothed along with solar, grid,
+battery and load when `smoothing_seconds` is set — a modulating compressor is
+closer in character to those than to an EV's abrupt start/stop, and because it
+shares a pool with the EV, unsmoothed jitter here would make the EV line flicker
+too.
+
+### `heat_pump_in_load`
+
+Leave this `false` if the heat pump is on a **dedicated circuit or sub-meter**
+that `load_power` does not see.
+
+Set it `true` if `load_power` is a **whole-home meter that already includes the
+heat pump** (common when it sits on the main consumer unit). The card then
+subtracts the heat pump from the home load before allocating flows, so the same
+watts are not counted twice — exactly like `ev_in_load` does for a wallbox. See
+the troubleshooting entry below.
+
+### Artwork
+
+Three sprites ship in `dist/backgrounds/`, picked automatically from the scene's
+weather and sun state:
+
+| File | Used for |
+| --- | --- |
+| `heat_pump_icon_day.png` | clear / cloudy daytime scenes |
+| `heat_pump_icon_rain.png` | rain, storm and snow — **and night**, see below |
+| `heat_pump_icon_night.png` | shipped but currently unused |
+
+The night render is near-black against an already-dark background and
+effectively disappears, so night scenes reuse the rain variant, whose mid-dark
+tone stays readable after dark. The night file is kept for anyone who wants to
+rework it.
+
+> **Installing manually:** copy the *whole* `dist/backgrounds/` folder (27 files:
+> 12 standard scenes, 12 heat pump scenes and these 3 sprites). Copying only the
+> standard scenes leaves heat pump backgrounds unavailable.
+
+The unit's position and feed line are tuned per scene, because only three of the
+12 backgrounds share the same camera framing. If you replace the artwork, adjust
+`HEAT_PUMP_SCENE_ORIGINS` and each scene's `line-heat-pump` entry — the
+[local preview](#local-preview) has a coordinate readout to make that easier.
+
 ## Troubleshooting
+
+### Nodes are active but no flow lines appear
+
+Check the raw sensor values and `unit_of_measurement` attributes in Home
+Assistant. Power values should be in mW, W, kW or MW; a bare value such as `0.9`
+without a unit is read as `0.9 W`, below the default `50 W` flow threshold.
+The card expects positive battery power to mean charging and negative power
+to mean discharging. If your battery sensor uses the opposite sign, set
+`battery_invert: true`. If the values and signs are correct and the lines
+remain invisible, include the sensor states, units and card configuration in
+the issue report so the missing allocation can be reproduced.
 
 ### The grid → battery line disappears while the car is charging
 
@@ -228,6 +333,23 @@ The card then subtracts the EV power from `load_power` before allocating flows, 
 grid → battery line stays visible while the car charges. Only set this if your load
 meter actually includes the wallbox — if you have a *dedicated* EV circuit that is **not**
 part of `load_power`, leave it `false`.
+
+### The heat pump line looks wrong, or the home load seems inflated
+
+**Cause:** the same double-counting issue as above, but for `heat_pump_power`. If your
+`load_power` sensor already includes the heat pump's draw (common when the heat pump is
+on the main consumer unit rather than a dedicated sub-meter), leaving `heat_pump_in_load`
+at its default (`false`) counts that power twice — once inside `load_power` and once as
+the separate Heat Pump node.
+
+**Fix:**
+
+```yaml
+heat_pump_in_load: true
+```
+
+Only set this if your load meter actually includes the heat pump — if it's on a
+*dedicated* circuit/sub-meter that is **not** part of `load_power`, leave it `false`.
 
 ### Grid / battery flow direction looks inverted
 
@@ -282,11 +404,42 @@ Night rain (grid + home + EV)
 
 ## Files
 
-- `dist/tesla-style-energy-flow.js`: packaged card file used by HACS
-- `dist/backgrounds/`: packaged background assets used by HACS
+- `dist/tesla-style-energy-flow.js`: hand-maintained card source used by HACS; it is not generated by a build step
+- `dist/backgrounds/`: packaged background assets used by HACS (12 standard scenes, 12 heat pump scenes, 3 sprites)
 - `hacs.json`: HACS metadata
 - `examples/lovelace-card.yaml`: config example
 - `docs/screenshots/`: preview images for README
+- `dev/`: local preview harness (not shipped by HACS) — see below
+- `tests/visual-polish.test.mjs`: regex regression checks over the packaged bundle
+
+## Local preview
+
+A standalone harness for working on the card without a running Home Assistant:
+
+```bash
+node dev/serve.js
+```
+
+Then open <http://localhost:8080/dev/preview.html>. It needs no dependencies —
+just Node. (A plain `python -m http.server` will *not* work: it serves `.js` as
+`text/plain`, which browsers refuse to load as an ES module.)
+
+It provides:
+
+- all 12 scenes, weather/sun state, and the dynamic-background toggle
+- sliders for solar, grid, battery, home load, heat pump, EV1/EV2 and SoC
+- toggles for which entities are "configured", plus `heat_pump_in_load` / `ev_in_load`
+- presets for common states (sunny export, night import, rain, EV charging, dual EV)
+- geometry debug: freeze the dash animation to see each path's full extent,
+  reveal inactive paths, a 25-unit viewBox grid, and artwork dimming
+- **hover the scene for live viewBox coordinates, click to copy** — useful when
+  re-tuning `scene_path_map` / `scene_component_map` against new artwork
+
+Run the tests with:
+
+```bash
+node tests/visual-polish.test.mjs
+```
 
 ## License
 
